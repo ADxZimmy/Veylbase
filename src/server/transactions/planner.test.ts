@@ -4,7 +4,7 @@ import { buildTransactionPlan } from "@/server/transactions/planner";
 const account = "0x1111111111111111111111111111111111111111";
 
 describe("transaction planner", () => {
-  it("plans a wrap as approve then wrapper call", async () => {
+  it("plans a wrap as a single explicit approve then wrapper call", async () => {
     const plan = await buildTransactionPlan({
       intent: "wrap",
       pairId: "usdc-mock-sepolia",
@@ -15,10 +15,13 @@ describe("transaction planner", () => {
     expect(plan.intent).toBe("wrap");
     expect(plan.pair?.confidential.symbol).toBe("cUSDCMock");
     expect(plan.steps.map((step) => step.id)).toContain("approve-wrapper");
-    expect(plan.steps.map((step) => step.id)).toContain("wrap");
-    expect(plan.steps.find((step) => step.id === "wrap")?.sdkAction?.method).toBe(
-      "shield"
-    );
+
+    const wrapStep = plan.steps.find((step) => step.id === "wrap");
+    // Each step models exactly one execution mechanism: the wrap step is the
+    // explicit on-chain call, not also a higher-level shield orchestration.
+    expect(wrapStep?.contractCall?.functionName).toBe("wrap");
+    expect(wrapStep?.contractCall?.sdkHelper).toBe("wrapContract");
+    expect(wrapStep?.sdkAction).toBeUndefined();
   });
 
   it("plans arbitrary ERC-7984 balance decryption without requiring registry membership", async () => {

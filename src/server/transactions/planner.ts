@@ -139,7 +139,7 @@ async function planWrap(input: Extract<TransactionPlanInput, { intent: "wrap" }>
       kind: "contract-write",
       title: `Wrap into ${pair.confidential.symbol}`,
       description:
-        "Call the wrapper after approval. The wrapper mints confidential ERC-7984 balance to the recipient.",
+        "Call the wrapper after approval. The wrapper mints confidential ERC-7984 balance to the recipient. Execute via WrappedToken.wrap, or use WrappedToken.shield to bundle this approve+wrap in one call.",
       blocking: true,
       contractCall: {
         target: pair.confidential.address,
@@ -150,15 +150,6 @@ async function planWrap(input: Extract<TransactionPlanInput, { intent: "wrap" }>
           amount: input.amountBaseUnits
         },
         sdkHelper: "wrapContract"
-      },
-      sdkAction: {
-        package: "@zama-fhe/sdk",
-        className: "WrappedToken",
-        method: "shield",
-        args: {
-          amount: input.amountBaseUnits,
-          to: recipient
-        }
       }
     }
   ], warnings);
@@ -239,14 +230,13 @@ async function planUnwrap(input: Extract<TransactionPlanInput, { intent: "unwrap
       kind: "sdk-action",
       title: "Finalize unwrap",
       description:
-        "Use WrappedToken.unshield for the full orchestrated flow or call finalizeUnwrap after public decryption.",
+        "After the requested amount is publicly decrypted, finalize the request to release the public tokens to the recipient.",
       blocking: true,
       sdkAction: {
         package: "@zama-fhe/sdk",
         className: "WrappedToken",
-        method: "unshield",
+        method: "finalizeUnwrap",
         args: {
-          amount: input.amountBaseUnits,
           to: recipient
         }
       }
