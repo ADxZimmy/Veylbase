@@ -1,0 +1,30 @@
+{
+  "pairs": [
+    {
+      "id": "local-usdz-sepolia",
+      "assetKey": "USDZ",
+      "mock": true,
+      "valid": true,
+      "underlying": {
+        "address": "0x0000000000000000000000000000000000000001",
+        "name": "USDZ Local Mock",
+        "symbol": "USDZMock",
+        "decimals": 6,
+        "mint": {
+          "mode": "public",
+          "perCallLimitTokens": "1000000",
+          "note": "Example only. Replace with a deployed local/dev token."
+        }
+      },
+      "confidential": {
+        "address": "0x0000000000000000000000000000000000000002",
+        "name": "Confidential USDZ Local Mock",
+        "symbol": "cUSDZMock",
+        "decimals": 6
+      },
+      "notes": [
+        "Copy this file to config/registry.local.json and replace addresses to add dev-only pairs."
+      ]
+    }
+  ]
+}

@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: #000; }
+  @keyframes vb-spin { to { transform: rotate(360deg); } }
+  @keyframes vb-fade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  @keyframes vb-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+  @keyframes vb-flicker { 0% { opacity: 0.15; filter: blur(3px); } 55% { opacity: 0.8; filter: blur(0.5px); } 100% { opacity: 1; filter: none; } }
+  @keyframes vb-rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+  ::selection { background: #FFD208; color: #000; }
+  @media (max-width: 1080px) { .vb-hero-scene { display: none !important; } }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.14); border-radius: 99px; border: 3px solid #000; }
+</style>
+</helmet>
+
+<div style="min-height: 100vh; background: #000; color: #fff; font-family: Inter, Arial, sans-serif; -webkit-font-smoothing: antialiased;">
+
+  <sc-if value="{{ showApp }}" hint-placeholder-val="{{ true }}">
+  <div style="width: min(100%, 1320px); margin: 0 auto; padding: 18px 24px 60px;">
+
+    <!-- TOPBAR -->
+    <header style="display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 6px 0 22px;">
+      <div style="display: inline-flex; align-items: center; gap: 12px;">
+        <span onClick="{{ goHome }}" style="display: grid; place-items: center; width: 40px; height: 40px; border-radius: 9px; background: #FFD208; color: #000; font: 800 1.15rem 'Space Grotesk', sans-serif; cursor: pointer;">V</span>
+        <span>
+          <strong style="display: block; font: 700 1rem 'Space Grotesk', sans-serif; line-height: 1.05;">Veylbase</strong>
+          <small style="display: block; margin-top: 2px; color: #a9a9a9; font-size: 0.78rem;">The confidential wrapper registry for Zama</small>
+        </span>
+      </div>
+      <nav style="display: flex; align-items: center; gap: 8px;">
+        <span style="display: inline-flex; align-items: center; gap: 7px; min-height: 38px; padding: 0 12px; border: 1px solid rgba(255,255,255,0.12); border-radius: 99px; color: #d8d8d8; font-size: 0.82rem; font-weight: 700;">
+          <span style="width: 7px; height: 7px; border-radius: 99px; background: #72e3a4;"></span>
+          Sepolia
+        </span>
+        <button onClick="{{ togglePlan }}" style="display: inline-flex; align-items: center; gap: 8px; min-height: 38px; padding: 0 13px; border: 1px solid rgba(255,255,255,0.16); border-radius: 8px; background: rgba(255,255,255,0.03); color: #fff; font-size: 0.82rem; font-weight: 800; cursor: pointer; font-family: inherit;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l-6-6 6-6M15 6l6 6-6 6" /></svg>
+          Developer plan
+        </button>
+        <sc-if value="{{ connectedBool }}" hint-placeholder-val="{{ false }}">
+          <button onClick="{{ toggleWallet }}" style="display: inline-flex; align-items: center; gap: 8px; min-height: 38px; padding: 0 14px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.16); background: rgba(255,255,255,0.03); color: #fff; font-size: 0.82rem; font-weight: 800; cursor: pointer; font-family: inherit;">
+            <span style="width: 7px; height: 7px; border-radius: 99px; background: #72e3a4;"></span>
+            {{ walletShort }}
+          </button>
+        </sc-if>
+        <sc-if value="{{ disconnectedBool }}" hint-placeholder-val="{{ true }}">
+          <button onClick="{{ toggleWallet }}" style="display: inline-flex; align-items: center; gap: 8px; min-height: 38px; padding: 0 14px; border-radius: 8px; border: 1px solid rgba(255,210,8,0.65); background: #FFD208; color: #000; font-size: 0.82rem; font-weight: 800; cursor: pointer; font-family: inherit;">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h15a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><path d="M16 13h2.5" /></svg>
+            Connect wallet
+          </button>
+        </sc-if>
+      </nav>
+    </header>
+
+    <!-- WORKSPACE: single-focus column -->
+    <div style="display: grid; grid-template-columns: minmax(0, 1fr); justify-items: center;">
+      <div style="width: 100%; max-width: 720px; display: grid; gap: 16px;">
+
+        <!-- Heading -->
+        <div style="display: grid; gap: 6px; padding: 6px 2px 0;">
+          <span style="color: #FFD208; font-size: 0.74rem; font-weight: 900; letter-spacing: 0.08em; text-transform: uppercase;">{{ actionEyebrow }}</span>
+          <h1 style="margin: 0; font: 600 2.05rem 'Space Grotesk', sans-serif; line-height: 1.05; letter-spacing: -0.01em;">{{ actionTitle }}</h1>
+          <p style="margin: 2px 0 0; max-width: 560px; color: #a9a9a9; font-size: 0.95rem; line-height: 1.55;">{{ actionSubtitle }}</p>
+        </div>
+
+        <!-- Action tabs -->
+        <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; padding: 5px; border: 1px solid rgba(255,255,255,0.1); border-radius: 11px; background: #0a0a0a;">
+          <button onClick="{{ tabWrap }}" style="position: relative; display: flex; align-items: center; justify-content: center; min-height: 44px; border: none; border-radius: 8px; background: transparent; cursor: pointer; font-family: Inter, sans-serif;">
+            <sc-if value="{{ wrapActive }}" hint-placeholder-val="{{ true }}"><span style="position: absolute; inset: 0; background: #FFD208; border-radius: 8px;"></span><span style="position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 7px; font-size: 0.9rem; font-weight: 800; color: #000;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 7.6-7 9-4-1.4-7-4.5-7-9V6z" /></svg>Shield</span></sc-if>
+            <sc-if value="{{ wrapInactive }}" hint-placeholder-val="{{ false }}"><span style="position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 7px; font-size: 0.9rem; font-weight: 800; color: #a9a9a9;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 7.6-7 9-4-1.4-7-4.5-7-9V6z" /></svg>Shield</span></sc-if>
+          </button>
+          <button onClick="{{ tabUnwrap }}" style="position: relative; display: flex; align-items: center; justify-content: center; min-height: 44px; border: none; border-radius: 8px; background: transparent; cursor: pointer; font-family: Inter, sans-serif;">
+            <sc-if value="{{ unwrapActive }}" hint-placeholder-val="{{ false }}"><span style="position: absolute; inset: 0; background: #FFD208; border-radius: 8px;"></span><span style="position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 7px; font-size: 0.9rem; font-weight: 800; color: #000;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.3M21 4v5h-5" /></svg>Unshield</span></sc-if>
+            <sc-if value="{{ unwrapInactive }}" hint-placeholder-val="{{ true }}"><span style="position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 7px; font-size: 0.9rem; font-weight: 800; color: #a9a9a9;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.3M21 4v5h-5" /></svg>Unshield</span></sc-if>
+          </button>
+          <button onClick="{{ tabReveal }}" style="position: relative; display: flex; align-items: center; justify-content: center; min-height: 44px; border: none; border-radius: 8px; background: transparent; cursor: pointer; font-family: Inter, sans-serif;">
+            <sc-if value="{{ revealActive }}" hint-placeholder-val="{{ false }}"><span style="position: absolute; inset: 0; background: #FFD208; border-radius: 8px;"></span><span style="position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 7px; font-size: 0.9rem; font-weight: 800; color: #000;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></svg>Reveal</span></sc-if>
+            <sc-if value="{{ revealInactive }}" hint-placeholder-val="{{ true }}"><span style="position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 7px; font-size: 0.9rem; font-weight: 800; color: #a9a9a9;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></svg>Reveal</span></sc-if>
+          </button>
+          <button onClick="{{ tabFaucet }}" style="position: relative; display: flex; align-items: center; justify-content: center; min-height: 44px; border: none; border-radius: 8px; background: transparent; cursor: pointer; font-family: Inter, sans-serif;">
+            <sc-if value="{{ faucetActive }}" hint-placeholder-val="{{ false }}"><span style="position: absolute; inset: 0; background: #FFD208; border-radius: 8px;"></span><span style="position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 7px; font-size: 0.9rem; font-weight: 800; color: #000;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3s6 5.8 6 11a6 6 0 0 1-12 0c0-5.2 6-11 6-11z" /></svg>Test tokens</span></sc-if>
+            <sc-if value="{{ faucetInactive }}" hint-placeholder-val="{{ true }}"><span style="position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 7px; font-size: 0.9rem; font-weight: 800; color: #a9a9a9;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3s6 5.8 6 11a6 6 0 0 1-12 0c0-5.2 6-11 6-11z" /></svg>Test tokens</span></sc-if>
+            <sc-if value="{{ faucetDisabled }}" hint-placeholder-val="{{ false }}"><span style="position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 7px; font-size: 0.9rem; font-weight: 800; color: #3f3f3f;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3s6 5.8 6 11a6 6 0 0 1-12 0c0-5.2 6-11 6-11z" /></svg>Test tokens</span></sc-if>
+          </button>
+        </div>
+
+        <!-- Main card -->
+        <div style="border: 1px solid rgba(255,255,255,0.12); border-radius: 14px; background: #0d0d0d; overflow: hidden;">
+
+          <!-- Asset selector -->
+          <button onClick="{{ openSheet }}" style="display: flex; align-items: center; gap: 14px; width: 100%; padding: 16px 18px; border: 0; border-bottom: 1px solid rgba(255,255,255,0.1); background: transparent; color: #fff; text-align: left; cursor: pointer; font-family: inherit;">
+            <span style="display: grid; place-items: center; width: 44px; height: 44px; flex: 0 0 auto; border-radius: 11px; background: #FFD208; color: #000; font: 700 0.92rem 'JetBrains Mono', monospace;">{{ selMono }}</span>
+            <span style="display: grid; gap: 2px; flex: 1; min-width: 0;">
+              <strong style="font: 600 1.05rem 'Space Grotesk', sans-serif;">{{ selSym }} <span style="color: #737373; font-weight: 500;">/ {{ selCsym }}</span></strong>
+              <small style="color: #a9a9a9; font-size: 0.82rem;">{{ selName }}</small>
+            </span>
+            <span style="display: grid; gap: 3px; text-align: right; flex: 0 0 auto;">
+              <small style="color: #737373; font-size: 0.68rem; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase;">Public · Private</small>
+              <span style="font: 600 0.9rem 'JetBrains Mono', monospace; color: #e8e8e8;">{{ selPubBal }} <span style="color: #FFD208;">· ••••••</span></span>
+            </span>
+            <span style="display: inline-flex; align-items: center; gap: 5px; flex: 0 0 auto; padding: 6px 10px; border: 1px solid rgba(255,255,255,0.14); border-radius: 8px; color: #d8d8d8; font-size: 0.78rem; font-weight: 800;">
+              Change
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6" /></svg>
+            </span>
+          </button>
+
+          <div style="padding: 20px 18px 22px;">
+
+            <!-- ===== AMOUNT FLOW (shield / unshield / faucet) ===== -->
+            <sc-if value="{{ isAmountFlow }}" hint-placeholder-val="{{ true }}">
+
+              <!-- idle -->
+              <sc-if value="{{ txIdle }}" hint-placeholder-val="{{ true }}">
+                <div style="display: grid; gap: 16px;">
+                  <div style="display: grid; gap: 8px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+                      <span style="color: #a9a9a9; font-size: 0.78rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase;">{{ amountLabel }}</span>
+                      <button onClick="{{ setMax }}" style="padding: 3px 9px; border: 1px solid rgba(255,210,8,0.4); border-radius: 7px; background: rgba(255,210,8,0.1); color: #FFD208; font-size: 0.72rem; font-weight: 900; cursor: pointer; font-family: inherit;">MAX</button>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 12px; min-height: 66px; padding: 0 16px; border: 1px solid rgba(255,255,255,0.14); border-radius: 11px; background: #060606;">
+                      <input value="{{ amount }}" onInput="{{ setAmount }}" inputmode="decimal" placeholder="0.00" style="flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: #fff; font: 700 1.7rem 'Space Grotesk', sans-serif;" />
+                      <span style="font: 600 1rem 'JetBrains Mono', monospace; color: #737373;">{{ fromSym }}</span>
+                    </div>
+                    <sc-if value="{{ amountError }}" hint-placeholder-val="{{ false }}">
+                      <span style="color: #f0a; color: #ff6b6b; font-size: 0.8rem; font-weight: 600;">{{ amountErrorText }}</span>
+                    </sc-if>
+                  </div>
+
+                  <!-- conversion preview -->
+                  <div style="display: grid; gap: 11px; padding: 16px; border: 1px solid rgba(255,255,255,0.1); border-radius: 11px; background: #060606;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+                      <span style="color: #a9a9a9; font-size: 0.86rem;">{{ previewSendLabel }}</span>
+                      <span style="font: 600 0.95rem 'JetBrains Mono', monospace; color: #fff;">{{ previewSend }}</span>
+                    </div>
+                    <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+                      <span style="color: #a9a9a9; font-size: 0.86rem;">{{ previewReceiveLabel }}</span>
+                      <span style="font: 700 1rem 'JetBrains Mono', monospace; color: #FFD208;">{{ previewReceive }}</span>
+                    </div>
+                    <sc-if value="{{ hasRefund }}" hint-placeholder-val="{{ false }}">
+                      <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding-top: 10px; border-top: 1px dashed rgba(255,255,255,0.14);">
+                        <span style="color: #a9a9a9; font-size: 0.82rem; line-height: 1.4; max-width: 70%;">Refunded — exceeds the wrapper's 6-decimal precision</span>
+                        <span style="font: 600 0.9rem 'JetBrains Mono', monospace; color: #e8e8e8; text-align: right;">{{ refundStr }}</span>
+                      </div>
+                    </sc-if>
+                    <div style="display: flex; align-items: center; gap: 8px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.08); color: #737373; font-size: 0.78rem; line-height: 1.45;">
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: 0 0 auto;"><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>
+                      <span>{{ previewNote }}</span>
+                    </div>
+                  </div>
+
+                  <sc-if value="{{ primaryEnabled }}" hint-placeholder-val="{{ true }}">
+                    <button onClick="{{ startTx }}" style="display: inline-flex; align-items: center; justify-content: center; min-height: 54px; border: none; border-radius: 10px; background: #FFD208; color: #000; font-size: 0.98rem; font-weight: 900; cursor: pointer; font-family: inherit;">{{ primaryLabel }}</button>
+                  </sc-if>
+                  <sc-if value="{{ primaryDisabled }}" hint-placeholder-val="{{ false }}">
+                    <button style="display: inline-flex; align-items: center; justify-content: center; min-height: 54px; border: none; border-radius: 10px; background: #FFD208; color: #000; font-size: 0.98rem; font-weight: 900; cursor: not-allowed; opacity: 0.42; font-family: inherit;">{{ primaryLabel }}</button>
+                  </sc-if>
+                </div>
+              </sc-if>
+
+              <!-- running -->
+              <sc-if value="{{ txRunning }}" hint-placeholder-val="{{ false }}">
+                <div style="display: grid; gap: 18px; padding: 4px 0;">
+                  <span style="color: #a9a9a9; font-size: 0.78rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase;">{{ runningHeading }}</span>
+                  <div style="display: grid; gap: 16px;">
+                    <sc-for list="{{ progressSteps }}" as="st" hint-placeholder-count="3">
+                      <div style="display: flex; align-items: center; gap: 13px;">
+                        <span style="display: grid; place-items: center; width: 28px; height: 28px; flex: 0 0 auto; border-radius: 99px; border: 1px solid rgba(255,255,255,0.14);">
+                          <sc-if value="{{ st.isDone }}" hint-placeholder-val="{{ false }}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FFD208" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l4 4L19 7" /></svg></sc-if>
+                          <sc-if value="{{ st.isActive }}" hint-placeholder-val="{{ false }}"><span style="width: 15px; height: 15px; border-radius: 99px; border: 2px solid rgba(255,210,8,0.25); border-top-color: #FFD208; animation: vb-spin 0.7s linear infinite;"></span></sc-if>
+                          <sc-if value="{{ st.isPending }}" hint-placeholder-val="{{ true }}"><span style="font: 600 0.72rem 'JetBrains Mono', monospace; color: #555;">{{ st.n }}</span></sc-if>
+                        </span>
+                        <span style="font: 600 0.96rem Inter, sans-serif; color: {{ st.color }};">{{ st.label }}</span>
+                      </div>
+                    </sc-for>
+                  </div>
+                </div>
+              </sc-if>
+
+              <!-- done -->
+              <sc-if value="{{ txDone }}" hint-placeholder-val="{{ false }}">
+                <div style="display: grid; gap: 16px; justify-items: center; text-align: center; padding: 14px 0 4px;">
+                  <span style="display: grid; place-items: center; width: 56px; height: 56px; border-radius: 99px; background: rgba(114,227,164,0.14); border: 1px solid rgba(114,227,164,0.4);">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#72e3a4" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l4 4L19 7" /></svg>
+                  </span>
+                  <div style="display: grid; gap: 5px;">
+                    <strong style="font: 600 1.3rem 'Space Grotesk', sans-serif;">{{ doneTitle }}</strong>
+                    <span style="color: #a9a9a9; font-size: 0.92rem;">{{ doneDetail }}</span>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 18px; padding: 12px 18px; border: 1px solid rgba(255,255,255,0.1); border-radius: 11px; background: #060606;">
+                    <span style="display: grid; gap: 3px; text-align: center;">
+                      <small style="color: #737373; font-size: 0.7rem; font-weight: 800; text-transform: uppercase;">Public {{ selSym }}</small>
+                      <span style="font: 600 1.05rem 'JetBrains Mono', monospace;">{{ selPubBal }}</span>
+                    </span>
+                    <span style="width: 1px; height: 30px; background: rgba(255,255,255,0.12);"></span>
+                    <span style="display: grid; gap: 3px; text-align: center;">
+                      <small style="color: #737373; font-size: 0.7rem; font-weight: 800; text-transform: uppercase;">Private {{ selCsym }}</small>
+                      <span style="font: 600 1.05rem 'JetBrains Mono', monospace; color: #FFD208;">••••••</span>
+                    </span>
+                  </div>
+                  <button onClick="{{ resetFlow }}" style="min-height: 46px; padding: 0 22px; border: 1px solid rgba(255,255,255,0.16); border-radius: 9px; background: rgba(255,255,255,0.04); color: #fff; font-size: 0.9rem; font-weight: 800; cursor: pointer; font-family: inherit;">Start another</button>
+                </div>
+              </sc-if>
+
+            </sc-if>
+
+            <!-- ===== REVEAL FLOW ===== -->
+            <sc-if value="{{ isReveal }}" hint-placeholder-val="{{ false }}">
+              <div style="display: grid; gap: 16px;">
+
+                <sc-if value="{{ revealHidden }}" hint-placeholder-val="{{ true }}">
+                  <div style="display: grid; gap: 16px;">
+                    <div style="display: grid; gap: 9px; justify-items: center; text-align: center; padding: 22px 16px; border: 1px solid rgba(255,210,8,0.22); border-radius: 12px; background: rgba(255,210,8,0.04);">
+                      <span style="color: #737373; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;">Private holding · {{ selCsym }}</span>
+                      <strong style="font: 600 2.6rem 'Space Grotesk', sans-serif; letter-spacing: 0.14em; color: #FFD208;">••••••</strong>
+                      <span style="display: inline-flex; align-items: center; gap: 6px; color: #a9a9a9; font-size: 0.82rem;">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>
+                        Hidden by default — encrypted on-chain
+                      </span>
+                    </div>
+                    <p style="margin: 0; color: #a9a9a9; font-size: 0.88rem; line-height: 1.55; text-align: center;">Revealing decrypts the balance to your wallet only. You sign a permit — no transaction, no on-chain trace.</p>
+                    <button onClick="{{ runReveal }}" style="display: inline-flex; align-items: center; justify-content: center; gap: 9px; min-height: 54px; border: 0; border-radius: 10px; background: #FFD208; color: #000; font-size: 0.98rem; font-weight: 900; cursor: pointer; font-family: inherit;">
+                      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></svg>
+                      {{ revealCta }}
+                    </button>
+                  </div>
+                </sc-if>
+
+                <sc-if value="{{ revealRunning }}" hint-placeholder-val="{{ false }}">
+                  <div style="display: grid; gap: 18px; padding: 6px 0;">
+                    <span style="color: #a9a9a9; font-size: 0.78rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase;">Decrypting privately</span>
+                    <div style="display: grid; gap: 16px;">
+                      <sc-for list="{{ revealSteps }}" as="st" hint-placeholder-count="3">
+                        <div style="display: flex; align-items: center; gap: 13px;">
+                          <span style="display: grid; place-items: center; width: 28px; height: 28px; flex: 0 0 auto; border-radius: 99px; border: 1px solid rgba(255,255,255,0.14);">
+                            <sc-if value="{{ st.isDone }}" hint-placeholder-val="{{ false }}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FFD208" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l4 4L19 7" /></svg></sc-if>
+                            <sc-if value="{{ st.isActive }}" hint-placeholder-val="{{ false }}"><span style="width: 15px; height: 15px; border-radius: 99px; border: 2px solid rgba(255,210,8,0.25); border-top-color: #FFD208; animation: vb-spin 0.7s linear infinite;"></span></sc-if>
+                            <sc-if value="{{ st.isPending }}" hint-placeholder-val="{{ true }}"><span style="font: 600 0.72rem 'JetBrains Mono', monospace; color: #555;">{{ st.n }}</span></sc-if>
+                          </span>
+                          <span style="font: 600 0.96rem Inter, sans-serif; color: {{ st.color }};">{{ st.label }}</span>
+                        </div>
+                      </sc-for>
+                    </div>
+                  </div>
+                </sc-if>
+
+                <sc-if value="{{ revealShown }}" hint-placeholder-val="{{ false }}">
+                  <div style="display: grid; gap: 14px; justify-items: center; text-align: center; padding: 8px 0;">
+                    <div style="display: grid; gap: 9px; justify-items: center; width: 100%; padding: 26px 16px; border: 1px solid rgba(255,210,8,0.5); border-radius: 12px; background: rgba(255,210,8,0.07);">
+                      <span style="color: #737373; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;">Private holding · {{ selCsym }}</span>
+                      <strong style="font: 600 2.6rem 'Space Grotesk', sans-serif; color: #fff;">{{ revealValue }}</strong>
+                      <span style="display: inline-flex; align-items: center; gap: 6px; color: #72e3a4; font-size: 0.82rem; font-weight: 600;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l4 4L19 7" /></svg>
+                        Decrypted for your wallet
+                      </span>
+                    </div>
+                    <span style="display: inline-flex; align-items: center; gap: 7px; color: #a9a9a9; font-size: 0.82rem;">
+                      <span style="width: 6px; height: 6px; border-radius: 99px; background: #FFD208; animation: vb-pulse 1.2s ease infinite;"></span>
+                      Re-hiding automatically
+                    </span>
+                    <button onClick="{{ hideReveal }}" style="min-height: 44px; padding: 0 20px; border: 1px solid rgba(255,255,255,0.16); border-radius: 9px; background: rgba(255,255,255,0.04); color: #fff; font-size: 0.88rem; font-weight: 800; cursor: pointer; font-family: inherit;">Hide now</button>
+                  </div>
+                </sc-if>
+
+              </div>
+            </sc-if>
+
+          </div>
+        </div>
+
+        <!-- Activity -->
+        <sc-if value="{{ showActivityPanel }}" hint-placeholder-val="{{ true }}">
+        <div style="display: grid; gap: 12px; padding: 16px 18px; border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; background: #0a0a0a;">
+          <span style="color: #737373; font-size: 0.72rem; font-weight: 900; letter-spacing: 0.06em; text-transform: uppercase;">Activity</span>
+          <div style="display: grid; gap: 11px;">
+            <sc-for list="{{ activity }}" as="ev" hint-placeholder-count="2">
+              <div style="display: flex; align-items: center; gap: 11px;">
+                <span style="width: 8px; height: 8px; flex: 0 0 auto; border-radius: 99px; background: {{ ev.dot }};"></span>
+                <span style="flex: 1; min-width: 0; font-size: 0.88rem; font-weight: 700; color: #e8e8e8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ ev.title }}</span>
+                <span style="flex: 0 0 auto; color: #737373; font-size: 0.78rem; font-family: 'JetBrains Mono', monospace;">{{ ev.time }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+        </sc-if>
+
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+  <!-- ===== LANDING ===== -->
+  <sc-if value="{{ showLanding }}" hint-placeholder-val="{{ false }}">
+  <div style="width: min(100%, 1240px); margin: 0 auto; padding: 22px 24px 60px;">
+    <header style="display: flex; align-items: center; justify-content: space-between; gap: 18px; min-height: 56px; margin-bottom: 22px;">
+      <div style="display: inline-flex; align-items: center; gap: 12px;">
+        <span style="display: grid; place-items: center; width: 40px; height: 40px; border-radius: 9px; background: #FFD208; color: #000; font: 800 1.15rem 'Space Grotesk', sans-serif;">V</span>
+        <span>
+          <strong style="display: block; font: 700 1rem 'Space Grotesk', sans-serif; line-height: 1.05;">Veylbase</strong>
+          <small style="display: block; margin-top: 2px; color: #a9a9a9; font-size: 0.78rem;">The confidential wrapper registry for Zama</small>
+        </span>
+      </div>
+      <button onClick="{{ enterApp }}" style="display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 18px; border: 1px solid rgba(255,210,8,0.65); border-radius: 9px; background: #FFD208; color: #000; font-size: 0.92rem; font-weight: 900; cursor: pointer; font-family: inherit;">
+        Enter dApp
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+      </button>
+    </header>
+
+    <section style="position: relative; display: grid; align-items: center; min-height: 640px; overflow: hidden; border: 1px solid rgba(255,255,255,0.12); border-radius: 16px; padding: clamp(32px, 7vw, 84px); background-image: linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px); background-size: 46px 46px; background-color: #050505;">
+      <div style="position: relative; z-index: 2; max-width: 640px;">
+        <span style="color: #FFD208; font-size: 0.78rem; font-weight: 900; letter-spacing: 0.08em; text-transform: uppercase;">Confidential assets, made usable</span>
+        <h1 style="max-width: 660px; margin: 16px 0 0; font: 600 clamp(2.9rem, 6vw, 5.4rem) 'Space Grotesk', sans-serif; line-height: 0.95; letter-spacing: -0.015em;">Private balances for public tokens.</h1>
+        <p style="max-width: 540px; margin: 24px 0 0; color: #d8d8d8; font-size: clamp(1rem, 2vw, 1.16rem); line-height: 1.65;">Veylbase gives Zama wrapper pairs a calm, wallet-first interface: choose an asset, shield it, and reveal only when you decide.</p>
+        <div style="display: flex; flex-wrap: wrap; gap: 11px; margin-top: 32px;">
+          <button onClick="{{ enterApp }}" style="display: inline-flex; align-items: center; gap: 9px; min-height: 54px; padding: 0 22px; border: 0; border-radius: 10px; background: #FFD208; color: #000; font-size: 1rem; font-weight: 900; cursor: pointer; font-family: inherit;">
+            Enter dApp
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="vb-hero-scene" style="position: absolute; right: clamp(24px, 5vw, 60px); top: 50%; transform: translateY(-50%); z-index: 1; display: grid; grid-template-columns: 150px 44px 150px; gap: 12px; align-items: center; opacity: 0.92; pointer-events: none;">
+        <div style="display: grid; gap: 7px; min-height: 140px; padding: 18px; border: 1px solid rgba(255,255,255,0.18); border-radius: 12px; background: rgba(0,0,0,0.55); backdrop-filter: blur(8px);">
+          <small style="color: #737373; font-size: 0.7rem; font-weight: 800; text-transform: uppercase;">Public</small>
+          <strong style="font: 600 1.7rem 'Space Grotesk', sans-serif;">USDC</strong>
+          <span style="color: #a9a9a9; font-family: 'JetBrains Mono', monospace; font-size: 0.88rem;">12,450.00</span>
+        </div>
+        <div style="display: grid; place-items: center; width: 44px; height: 44px; border-radius: 99px; background: #FFD208; color: #000;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 7.6-7 9-4-1.4-7-4.5-7-9V6z" /></svg>
+        </div>
+        <div style="display: grid; gap: 7px; min-height: 140px; padding: 18px; border: 1px solid rgba(255,210,8,0.5); border-radius: 12px; background: rgba(255,210,8,0.08); backdrop-filter: blur(8px);">
+          <small style="color: #737373; font-size: 0.7rem; font-weight: 800; text-transform: uppercase;">Private</small>
+          <strong style="font: 600 1.7rem 'Space Grotesk', sans-serif;">cUSDC</strong>
+          <span style="color: #FFD208; font-family: 'JetBrains Mono', monospace; font-size: 0.95rem; letter-spacing: 0.08em;">••••••</span>
+        </div>
+      </div>
+    </section>
+
+    <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; margin-top: 22px; overflow: hidden; border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; background: rgba(255,255,255,0.12);">
+      <div style="display: flex; align-items: center; gap: 10px; min-height: 92px; padding: 18px; background: #0a0a0a; font-weight: 800; color: #e8e8e8;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFD208" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9" /><path d="M12 8v4l3 2" /></svg>Choose an asset</div>
+      <div style="display: flex; align-items: center; gap: 10px; min-height: 92px; padding: 18px; background: #0a0a0a; font-weight: 800; color: #e8e8e8;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFD208" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 7.6-7 9-4-1.4-7-4.5-7-9V6z" /></svg>Shield balance</div>
+      <div style="display: flex; align-items: center; gap: 10px; min-height: 92px; padding: 18px; background: #0a0a0a; font-weight: 800; color: #e8e8e8;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFD208" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></svg>Reveal on demand</div>
+      <div style="display: flex; align-items: center; gap: 10px; min-height: 92px; padding: 18px; background: #0a0a0a; font-weight: 800; color: #e8e8e8;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFD208" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h15a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /></svg>Return to public</div>
+    </div>
+  </div>
+  </sc-if>
+
+  <!-- ===== ASSET SHEET ===== -->
+  <sc-if value="{{ assetOpen }}" hint-placeholder-val="{{ false }}">
+  <div onClick="{{ closeSheet }}" style="position: fixed; inset: 0; z-index: 40; display: grid; place-items: start center; padding: 7vh 18px; background: rgba(0,0,0,0.6); backdrop-filter: blur(5px);">
+    <div onClick="{{ stop }}" style="width: 100%; max-width: 540px; max-height: 80vh; display: grid; grid-template-rows: auto auto 1fr; gap: 14px; padding: 20px; border: 1px solid rgba(255,255,255,0.14); border-radius: 16px; background: #0d0d0d; box-shadow: 0 30px 80px rgba(0,0,0,0.6);">
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+        <strong style="font: 600 1.2rem 'Space Grotesk', sans-serif;">Choose an asset</strong>
+        <button onClick="{{ closeSheet }}" style="display: grid; place-items: center; width: 34px; height: 34px; border: 1px solid rgba(255,255,255,0.14); border-radius: 8px; background: transparent; color: #a9a9a9; cursor: pointer;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18" /></svg></button>
+      </div>
+      <div style="display: grid; gap: 10px;">
+        <div style="display: flex; align-items: center; gap: 10px; min-height: 46px; padding: 0 13px; border: 1px solid rgba(255,255,255,0.12); border-radius: 9px; background: #060606;">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#737373" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7" /><path d="M21 21l-4-4" /></svg>
+          <input value="{{ query }}" onInput="{{ setQuery }}" placeholder="Search assets" style="flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: #fff; font-size: 0.95rem;" />
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 4px; border: 1px solid rgba(255,255,255,0.1); border-radius: 9px; background: #060606;">
+          <sc-for list="{{ filterTabs }}" as="ft" hint-placeholder-count="3">
+            <button onClick="{{ ft.onSelect }}" style="position: relative; min-height: 34px; display: inline-flex; align-items: center; justify-content: center; border: none; border-radius: 7px; background: transparent; cursor: pointer; font-family: Inter, sans-serif;">
+              <sc-if value="{{ ft.active }}" hint-placeholder-val="{{ false }}"><span style="position: absolute; inset: 0; background: #FFD208; border-radius: 7px;"></span><span style="position: relative; z-index: 1; font-size: 0.82rem; font-weight: 800; color: #000;">{{ ft.label }}</span></sc-if>
+              <sc-if value="{{ ft.inactive }}" hint-placeholder-val="{{ true }}"><span style="position: relative; z-index: 1; font-size: 0.82rem; font-weight: 800; color: #a9a9a9;">{{ ft.label }}</span></sc-if>
+            </button>
+          </sc-for>
+        </div>
+      </div>
+      <div style="display: grid; gap: 6px; overflow-y: auto; overflow-x: hidden; padding-right: 2px;">
+        <sc-for list="{{ filteredPairs }}" as="p" hint-placeholder-count="5">
+          <button onClick="{{ p.onSelect }}" style="{{ p.rowStyle }}">
+            <span style="display: grid; place-items: center; width: 40px; height: 40px; flex: 0 0 auto; border-radius: 10px; background: rgba(255,210,8,0.12); color: #FFD208; font: 700 0.82rem 'JetBrains Mono', monospace;">{{ p.mono }}</span>
+            <span style="display: grid; gap: 2px; flex: 1; min-width: 0; text-align: left;">
+              <strong style="font: 600 0.98rem 'Space Grotesk', sans-serif;">{{ p.sym }} <span style="color: #737373; font-weight: 500;">/ {{ p.csym }}</span></strong>
+              <small style="color: #a9a9a9; font-size: 0.8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ p.name }}</small>
+            </span>
+            <span style="display: flex; flex-wrap: wrap; gap: 5px; flex: 0 0 auto; justify-content: flex-end;">
+              <sc-for list="{{ p.tags }}" as="tg" hint-placeholder-count="1">
+                <span style="{{ tg.style }}">{{ tg.label }}</span>
+              </sc-for>
+            </span>
+          </button>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+  <!-- ===== DEVELOPER PLAN DRAWER ===== -->
+  <sc-if value="{{ planOpen }}" hint-placeholder-val="{{ false }}">
+  <div onClick="{{ togglePlan }}" style="position: fixed; inset: 0; z-index: 50; display: flex; justify-content: flex-end; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px);">
+    <div onClick="{{ stop }}" style="width: min(100%, 480px); height: 100%; display: grid; grid-template-rows: auto auto 1fr; overflow: hidden; border-left: 1px solid rgba(255,255,255,0.14); background: #0a0a0a;">
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 20px; border-bottom: 1px solid rgba(255,255,255,0.1);">
+        <div style="display: grid; gap: 3px;">
+          <strong style="font: 600 1.08rem 'Space Grotesk', sans-serif;">Transaction plan</strong>
+          <small style="color: #737373; font-size: 0.78rem;">{{ planTitle }}</small>
+        </div>
+        <button onClick="{{ togglePlan }}" style="display: grid; place-items: center; width: 34px; height: 34px; border: 1px solid rgba(255,255,255,0.14); border-radius: 8px; background: transparent; color: #a9a9a9; cursor: pointer;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l12 12M18 6L6 18" /></svg></button>
+      </div>
+      <div style="display: grid; gap: 8px; padding: 14px 20px; border-bottom: 1px solid rgba(255,255,255,0.1); background: #060606;">
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+          <span style="color: #737373; font-size: 0.74rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;">Network</span>
+          <span style="font: 500 0.8rem 'JetBrains Mono', monospace; color: #d8d8d8;">Sepolia · 11155111</span>
+        </div>
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+          <span style="color: #737373; font-size: 0.74rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;">Registry</span>
+          <span style="font: 500 0.8rem 'JetBrains Mono', monospace; color: #d8d8d8;">0x2f07…128e</span>
+        </div>
+      </div>
+      <div style="display: grid; gap: 12px; align-content: start; overflow-y: auto; padding: 18px 20px;">
+        <sc-for list="{{ planSteps }}" as="st" hint-placeholder-count="4">
+          <div style="display: grid; gap: 9px; padding: 14px; border: 1px solid rgba(255,255,255,0.1); border-radius: 11px; background: #0d0d0d;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <span style="display: grid; place-items: center; width: 24px; height: 24px; flex: 0 0 auto; border-radius: 7px; background: rgba(255,255,255,0.06); font: 600 0.76rem 'JetBrains Mono', monospace; color: #a9a9a9;">{{ st.n }}</span>
+              <strong style="flex: 1; min-width: 0; font: 600 0.94rem 'Space Grotesk', sans-serif;">{{ st.title }}</strong>
+              <span style="{{ st.kindStyle }}">{{ st.kind }}</span>
+            </div>
+            <p style="margin: 0; color: #a9a9a9; font-size: 0.82rem; line-height: 1.5;">{{ st.desc }}</p>
+            <sc-if value="{{ st.hasCall }}" hint-placeholder-val="{{ false }}">
+              <div style="display: grid; gap: 5px; padding: 9px 11px; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; background: #060606;">
+                <span style="font: 500 0.76rem 'JetBrains Mono', monospace; color: #FFD208; word-break: break-all;">{{ st.sig }}</span>
+                <span style="font: 500 0.74rem 'JetBrains Mono', monospace; color: #737373; word-break: break-all;">→ {{ st.addr }}</span>
+              </div>
+            </sc-if>
+          </div>
+        </sc-for>
+        <p style="margin: 4px 0 0; color: #555; font-size: 0.74rem; line-height: 1.5;">Plan derived from the Veylbase transaction planner. References: Zama wrapper-registry &amp; confidential-wrapper docs.</p>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1320,&quot;height&quot;:880},&quot;startScreen&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;app&quot;,&quot;landing&quot;],&quot;default&quot;:&quot;app&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Demo&quot;},&quot;txSpeed&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;cinematic&quot;,&quot;snappy&quot;,&quot;instant&quot;],&quot;default&quot;:&quot;cinematic&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Demo&quot;},&quot;showActivity&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Demo&quot;}}">
+class Component extends DCLogic {
+  PAIRS = [
+    { id: 'usdc-mock-sepolia', sym: 'USDC', csym: 'cUSDC', name: 'USDC Mock', dec: 6, faucet: true, mock: true, uAddr: '0x9b5Cd13b8eFbB58Dc25A05CF411D8056058aDFfF', cAddr: '0x7c5BF43B851c1dff1a4feE8dB225b87f2C223639' },
+    { id: 'usdt-mock-sepolia', sym: 'USDT', csym: 'cUSDT', name: 'USDT Mock', dec: 6, faucet: true, mock: true, uAddr: '0xa7dA08FafDC9097Cc0E7D4f113A61e31d7e8e9b0', cAddr: '0x4E7B06D78965594eB5EF5414c357ca21E1554491' },
+    { id: 'weth-mock-sepolia', sym: 'WETH', csym: 'cWETH', name: 'WETH Mock', dec: 18, faucet: true, mock: true, uAddr: '0xff54739b16576FA5402F211D0b938469Ab9A5f3F', cAddr: '0x46208622DA27d91db4f0393733C8BA082ed83158' },
+    { id: 'bron-mock-sepolia', sym: 'BRON', csym: 'cBRON', name: 'BRON Mock', dec: 18, faucet: true, mock: true, uAddr: '0xFf021fB13cA64e5354c62c954b949a88cfDEb25E', cAddr: '0xaa5612FA27c927a0c7961f5AEFEE5ba3A0F9C891' },
+    { id: 'zama-mock-sepolia', sym: 'ZAMA', csym: 'cZAMA', name: 'ZAMA Mock', dec: 18, faucet: true, mock: true, testOnly: true, uAddr: '0x75355a85c6FB9df5f0C80FF54e8747EEe9a0BF57', cAddr: '0xf2D628d2598aF4eAF94CB76a437Ff86CA78FfbFB' },
+    { id: 'tgbp-mock-sepolia', sym: 'tGBP', csym: 'ctGBP', name: 'tGBP Mock', dec: 18, faucet: true, mock: true, uAddr: '0x93c931278A2aad1916783F952f94276eA5111442', cAddr: '0xfCE5c7069c5525eF6c8C2b2E35A745bA20a2F7CC' },
+    { id: 'xaut-mock-sepolia', sym: 'XAUt', csym: 'cXAUt', name: 'Tether Gold Mock', dec: 6, faucet: true, mock: true, uAddr: '0x24377AE4AA0C45ecEe71225007f17c5D423dd940', cAddr: '0xe4FcF848739845BC81Dee1d5352cf3844F0a60C7' },
+    { id: 'tgbp-official-sepolia', sym: 'tGBP', csym: 'ctGBP', name: 'tGBP (official)', dec: 18, faucet: false, mock: false, uAddr: '0xf6Ef9ADB61A48E29E36bc873070A46A3D2667ff3', cAddr: '0x167DC962808B32CFFFc7e14B5018c0bE06A3A208' }
+  ];
+
+  state = {
+    screen: null,
+    connected: false,
+    selectedId: 'usdc-mock-sepolia',
+    action: 'wrap',
+    amount: '100',
+    query: '',
+    filter: 'all',
+    assetSheetOpen: false,
+    planDrawerOpen: false,
+    tx: { status: 'idle', step: 0 },
+    reveal: { status: 'hidden', step: 0, value: null },
+    activity: [{ title: 'Connect your wallet to begin', time: 'now', dot: '#737373' }],
+    balances: {
+      'usdc-mock-sepolia': { pub: 12450, priv: 3200 },
+      'usdt-mock-sepolia': { pub: 8000, priv: 1500 },
+      'weth-mock-sepolia': { pub: 4.182, priv: 1.5 },
+      'bron-mock-sepolia': { pub: 52000, priv: 12000 },
+      'zama-mock-sepolia': { pub: 100000, priv: 25000 },
+      'tgbp-mock-sepolia': { pub: 6400, priv: 900 },
+      'xaut-mock-sepolia': { pub: 3.52, priv: 1.2 },
+      'tgbp-official-sepolia': { pub: 0, priv: 0 }
+    }
+  };
+
+  _timers = [];
+  componentWillUnmount() { this.clearTimers(); }
+  clearTimers() { this._timers.forEach(clearTimeout); this._timers = []; }
+
+  // ---- derived ----
+  effScreen() { return this.state.screen || this.props.startScreen || 'app'; }
+  speedMul() { const s = this.props.txSpeed || 'cinematic'; return s === 'instant' ? 0.06 : s === 'snappy' ? 0.45 : 1; }
+  pair() { return this.PAIRS.find(p => p.id === this.state.selectedId) || this.PAIRS[0]; }
+  bal() { return this.state.balances[this.state.selectedId] || { pub: 0, priv: 0 }; }
+  isReveal() { return this.state.action === 'decryptBalance'; }
+
+  floorTo(n, d) { const f = Math.pow(10, d); return Math.floor((Number(n) + 1e-12) * f) / f; }
+  amountNum() { const v = parseFloat(this.state.amount); return isFinite(v) && v > 0 ? v : 0; }
+  received() { const p = this.pair(); const a = this.amountNum(); return p.dec > 6 ? this.floorTo(a, 6) : a; }
+  refundVal() { const p = this.pair(); const a = this.amountNum(); return p.dec > 6 ? a - this.floorTo(a, 6) : 0; }
+
+  fmt(n, dec) {
+    const d = dec == null ? 2 : Math.min(dec, 6);
+    return Number(n).toLocaleString('en-US', { minimumFractionDigits: Math.min(2, d), maximumFractionDigits: d });
+  }
+  fmtRefund(n) { let s = Number(n).toFixed(12); s = s.replace(/0+$/, '').replace(/\.$/, ''); return s; }
+  fmtPlain(n) { return Number(n).toLocaleString('en-US', { maximumFractionDigits: 8 }); }
+
+  // ---- progress definitions ----
+  progressDefs() {
+    const p = this.pair();
+    const connect = this.state.connected ? [] : [{ label: 'Connect wallet', delay: 1000 }];
+    const a = this.state.action;
+    if (a === 'wrap') return connect.concat([
+      { label: 'Approve ' + p.sym, delay: 1100 },
+      { label: 'Shield into ' + p.csym, delay: 1250 }
+    ]);
+    if (a === 'unwrap') return connect.concat([
+      { label: 'Encrypt amount', delay: 1050 },
+      { label: 'Request unshield', delay: 1150 },
+      { label: 'Wait for confirmation', delay: 1900 },
+      { label: 'Finalize · receive ' + p.sym, delay: 1300 }
+    ]);
+    if (a === 'claimFaucet') return connect.concat([
+      { label: 'Mint ' + p.sym + ' test tokens', delay: 1150 }
+    ]);
+    return connect;
+  }
+  revealDefs() {
+    const connect = this.state.connected ? [] : [{ label: 'Connect wallet', delay: 900 }];
+    return connect.concat([
+      { label: 'Read encrypted balance', delay: 950 },
+      { label: 'Sign reveal permit', delay: 1150 },
+      { label: 'Decrypt balance', delay: 1400 }
+    ]);
+  }
+
+  // ---- actions ----
+  go(screen) { this.clearTimers(); this.setState({ screen, assetSheetOpen: false, planDrawerOpen: false }); }
+  toggleWallet() {
+    if (this.state.connected) { this.setState({ connected: false, activity: [{ title: 'Wallet disconnected', time: 'now', dot: '#737373' }].concat(this.state.activity).slice(0, 6) }); }
+    else { this.setState({ connected: true, activity: [{ title: 'Wallet connected', time: 'now', dot: '#72e3a4' }].concat(this.state.activity).slice(0, 6) }); }
+  }
+  selectAction(a) {
+    this.clearTimers();
+    this.setState({ action: a, tx: { status: 'idle', step: 0 }, reveal: { status: 'hidden', step: 0, value: null } });
+  }
+  selectPair(id) {
+    const p = this.PAIRS.find(x => x.id === id);
+    const next = { selectedId: id, assetSheetOpen: false, tx: { status: 'idle', step: 0 }, reveal: { status: 'hidden', step: 0, value: null } };
+    if (this.state.action === 'claimFaucet' && p && !p.faucet) next.action = 'wrap';
+    this.clearTimers();
+    this.setState(next);
+  }
+  setAmount(e) { this.setState({ amount: e.target.value }); }
+  setMax() {
+    const p = this.pair(); const b = this.bal();
+    let v = this.state.action === 'unwrap' ? b.priv : this.state.action === 'claimFaucet' ? 1000 : b.pub;
+    this.setState({ amount: String(v) });
+  }
+  setQuery(e) { this.setState({ query: e.target.value }); }
+  setFilter(f) { this.setState({ filter: f }); }
+
+  startTx() {
+    if (this.primaryDisabled()) return;
+    const defs = this.progressDefs();
+    this.clearTimers();
+    this.setState({ tx: { status: 'running', step: 0 } });
+    this.runSeq(defs, 0, () => this.completeTx());
+  }
+  runSeq(defs, i, done) {
+    if (i >= defs.length) { done(); return; }
+    this.setState(s => ({ tx: { status: 'running', step: i } }));
+    const t = setTimeout(() => this.runSeq(defs, i + 1, done), defs[i].delay * this.speedMul());
+    this._timers.push(t);
+  }
+  completeTx() {
+    const p = this.pair(); const id = p.id; const a = this.state.action;
+    const amt = this.amountNum();
+    const balances = Object.assign({}, this.state.balances);
+    const b = Object.assign({}, balances[id]);
+    let title = '';
+    if (a === 'wrap') { const r = this.received(); b.pub = Math.max(0, b.pub - amt); b.priv = b.priv + r; title = 'Shielded ' + this.fmt(r, p.dec) + ' ' + p.csym; }
+    else if (a === 'unwrap') { b.priv = Math.max(0, b.priv - amt); b.pub = b.pub + amt; title = 'Unshielded ' + this.fmt(amt, p.dec) + ' ' + p.sym; }
+    else if (a === 'claimFaucet') { b.pub = b.pub + amt; title = 'Minted ' + this.fmt(amt, p.dec) + ' ' + p.sym; }
+    balances[id] = b;
+    this.setState({
+      connected: true,
+      balances,
+      tx: { status: 'done', step: 0 },
+      activity: [{ title, time: 'now', dot: '#FFD208' }].concat(this.state.activity).slice(0, 6)
+    });
+  }
+  resetFlow() { this.clearTimers(); this.setState({ tx: { status: 'idle', step: 0 } }); }
+
+  runReveal() {
+    const defs = this.revealDefs();
+    this.clearTimers();
+    this.setState({ reveal: { status: 'running', step: 0, value: null } });
+    this.runRevealSeq(defs, 0);
+  }
+  runRevealSeq(defs, i) {
+    if (i >= defs.length) { this.finishReveal(); return; }
+    this.setState({ reveal: { status: 'running', step: i, value: null } });
+    const t = setTimeout(() => this.runRevealSeq(defs, i + 1), defs[i].delay * this.speedMul());
+    this._timers.push(t);
+  }
+  finishReveal() {
+    const p = this.pair(); const b = this.bal();
+    const val = this.fmt(b.priv, p.dec) + ' ' + p.csym;
+    this.setState({
+      connected: true,
+      reveal: { status: 'shown', step: 0, value: val },
+      activity: [{ title: 'Revealed ' + p.csym + ' balance', time: 'now', dot: '#72e3a4' }].concat(this.state.activity).slice(0, 6)
+    });
+    const t = setTimeout(() => {
+      if (this.state.reveal.status === 'shown') this.setState({ reveal: { status: 'hidden', step: 0, value: null } });
+    }, 8000);
+    this._timers.push(t);
+  }
+  hideReveal() { this.clearTimers(); this.setState({ reveal: { status: 'hidden', step: 0, value: null } }); }
+
+  primaryDisabled() {
+    const a = this.state.action; const b = this.bal(); const p = this.pair(); const amt = this.amountNum();
+    if (amt <= 0) return true;
+    if (a === 'wrap' && amt > b.pub) return true;
+    if (a === 'unwrap' && amt > b.priv) return true;
+    if (a === 'claimFaucet' && !p.faucet) return true;
+    if (a === 'claimFaucet' && amt > 1000000) return true;
+    return false;
+  }
+
+  tabStyle(active, disabled) {
+    return 'display:flex;align-items:center;justify-content:center;gap:7px;min-height:44px;border-radius:8px;border:none;'
+      + 'background:' + (active ? '#FFD208' : 'transparent') + ';'
+      + 'color:' + (active ? '#000' : (disabled ? '#3f3f3f' : '#a9a9a9')) + ';'
+      + 'font-weight:800;font-size:0.9rem;cursor:' + (disabled ? 'not-allowed' : 'pointer') + ';font-family:Inter,sans-serif;transition:all 180ms ease;';
+  }
+  pillStyle(active) {
+    return 'min-height:34px;display:inline-flex;align-items:center;justify-content:center;border:none;border-radius:7px;'
+      + 'background:' + (active ? '#FFD208' : 'transparent') + ';color:' + (active ? '#000' : '#a9a9a9') + ';'
+      + 'font-size:0.82rem;font-weight:800;cursor:pointer;font-family:Inter,sans-serif;transition:all 160ms ease;';
+  }
+  tagStyle(kind) {
+    const base = 'min-height:22px;display:inline-flex;align-items:center;border-radius:99px;padding:2px 8px;font-size:0.66rem;font-weight:900;';
+    if (kind === 'warn') return base + 'border:1px solid rgba(255,107,107,0.4);color:#ff8585;';
+    if (kind === 'muted') return base + 'border:1px solid rgba(255,255,255,0.16);color:#a9a9a9;';
+    return base + 'border:1px solid rgba(255,210,8,0.32);color:#FFD208;';
+  }
+  kindBadge(kind) {
+    const write = kind === 'contract-write' || kind === 'wallet-signature';
+    return 'flex:0 0 auto;padding:3px 8px;border-radius:6px;font-size:0.64rem;font-weight:800;'
+      + "font-family:'JetBrains Mono',monospace;text-transform:uppercase;letter-spacing:0.03em;white-space:nowrap;"
+      + 'background:' + (write ? 'rgba(255,210,8,0.14)' : 'rgba(255,255,255,0.06)') + ';'
+      + 'color:' + (write ? '#FFD208' : '#a9a9a9') + ';';
+  }
+  shortAddr(a) { return a.slice(0, 6) + '…' + a.slice(-4); }
+
+  planStepsFor() {
+    const p = this.pair(); const a = this.state.action;
+    const wallet = { n: 1, kind: 'wallet-check', title: 'Connected wallet on Sepolia', desc: 'Confirm the active wallet is on Sepolia (11155111) before submitting.', hasCall: false };
+    let raw = [];
+    if (a === 'wrap') raw = [
+      wallet,
+      { n: 2, kind: 'chain-read', title: 'Check ' + p.sym + ' balance', desc: 'Read the public ERC-20 balance before approval.', hasCall: true, sig: 'balanceOf(address owner) view returns (uint256)', addr: this.shortAddr(p.uAddr) },
+      { n: 3, kind: 'contract-write', title: 'Approve ' + p.csym, desc: 'Approve the wrapper to spend the exact base-unit amount.', hasCall: true, sig: 'approve(address spender,uint256 amount)', addr: this.shortAddr(p.uAddr) },
+      { n: 4, kind: 'contract-write', title: 'Wrap into ' + p.csym, desc: 'Wrapper mints confidential ERC-7984 balance to the recipient.', hasCall: true, sig: 'wrap(address to,uint256 amount) returns (euint64)', addr: this.shortAddr(p.cAddr) }
+    ];
+    else if (a === 'unwrap') raw = [
+      wallet,
+      { n: 2, kind: 'sdk-action', title: 'Check ' + p.csym + ' balance', desc: 'Token.balanceOf catches insufficient confidential balance early.', hasCall: false },
+      { n: 3, kind: 'sdk-action', title: 'Encrypt unwrap amount', desc: 'Create an external euint64 input and proof for the amount.', hasCall: false },
+      { n: 4, kind: 'contract-write', title: 'Request ' + p.csym + ' unwrap', desc: 'Emits UnwrapRequested with an unwrapRequestId.', hasCall: true, sig: 'unwrap(address from,address to,bytes32 encryptedAmount,bytes inputProof) returns (bytes32)', addr: this.shortAddr(p.cAddr) },
+      { n: 5, kind: 'wait', title: 'Wait for UnwrapRequested', desc: 'Read the receipt and extract unwrapRequestId from the event.', hasCall: false },
+      { n: 6, kind: 'sdk-action', title: 'Finalize unwrap', desc: 'WrappedToken.unshield runs the full orchestrated finalize flow.', hasCall: false }
+    ];
+    else if (a === 'decryptBalance') raw = [
+      wallet,
+      { n: 2, kind: 'chain-read', title: 'Read encrypted balance handle', desc: 'confidentialBalanceOf before user decryption.', hasCall: true, sig: 'confidentialBalanceOf(address owner) view returns (euint64)', addr: this.shortAddr(p.cAddr) },
+      { n: 3, kind: 'wallet-signature', title: 'Sign EIP-712 decryption permit', desc: 'User authorizes decryption — no transaction is sent.', hasCall: false },
+      { n: 4, kind: 'sdk-action', title: 'Decrypt balance', desc: 'Token.balanceOf handles user decryption and returns plaintext.', hasCall: false }
+    ];
+    else if (a === 'claimFaucet') raw = [
+      wallet,
+      { n: 2, kind: 'contract-write', title: 'Mint ' + p.sym, desc: 'Call the mock ERC-20 mint so the wallet can test the wrap flow.', hasCall: true, sig: 'mint(address to,uint256 amount)', addr: this.shortAddr(p.uAddr) }
+    ];
+    return raw.map(s => Object.assign({}, s, { kindStyle: this.kindBadge(s.kind) }));
+  }
+
+  renderVals() {
+    const screen = this.effScreen();
+    const p = this.pair();
+    const b = this.bal();
+    const a = this.state.action;
+    const reveal = this.isReveal();
+    const tx = this.state.tx;
+    const rv = this.state.reveal;
+    const connected = this.state.connected;
+
+    const eyebrows = { wrap: 'Shield', unwrap: 'Unshield', decryptBalance: 'Reveal', claimFaucet: 'Test tokens' };
+    const titles = {
+      wrap: 'Make ' + p.sym + ' private',
+      unwrap: 'Return ' + p.csym + ' to public',
+      decryptBalance: 'Reveal a private balance',
+      claimFaucet: 'Get ' + p.sym + ' test tokens'
+    };
+    const subtitles = {
+      wrap: 'Wrap your public balance into a confidential ' + p.csym + ' position. Amounts and balances stay encrypted on-chain.',
+      unwrap: 'Unwrap confidential ' + p.csym + ' back to public ' + p.sym + '. This is a two-step confirmation.',
+      decryptBalance: 'Decrypt your confidential balance privately. You sign a permit — nothing is broadcast.',
+      claimFaucet: 'Mint mock ' + p.sym + ' so you have something to shield. Sepolia testing only.'
+    };
+
+    // amount flow preview
+    const amt = this.amountNum();
+    const received = this.received();
+    const refund = this.refundVal();
+    const hasRefund = a === 'wrap' && refund > 0;
+    let previewSendLabel = 'You shield', previewReceiveLabel = 'You receive', previewNote = '';
+    let previewSend = this.fmtPlain(amt) + ' ' + p.sym;
+    let previewReceive = this.fmt(received, p.dec) + ' ' + p.csym;
+    if (a === 'wrap') { previewNote = 'Wrapped 1:1 · confidential balance is capped at 6 decimals.'; }
+    if (a === 'unwrap') { previewSendLabel = 'You unshield'; previewReceiveLabel = 'You receive'; previewSend = this.fmtPlain(amt) + ' ' + p.csym; previewReceive = this.fmtPlain(amt) + ' ' + p.sym; previewNote = 'Two-step: request then finalize. Funds arrive after confirmation.'; }
+    if (a === 'claimFaucet') { previewSendLabel = 'You mint'; previewReceiveLabel = 'You receive'; previewSend = this.fmtPlain(amt) + ' ' + p.sym; previewReceive = this.fmtPlain(amt) + ' ' + p.sym; previewNote = 'Public mock faucet · up to 1,000,000 per call.'; }
+
+    const amountLabel = a === 'wrap' ? 'Amount to shield' : a === 'unwrap' ? 'Amount to unshield' : 'Amount to mint';
+    const fromSym = (a === 'unwrap') ? p.csym : p.sym;
+
+    // validation
+    const disabled = this.primaryDisabled();
+    let amountError = false, amountErrorText = '';
+    if (amt > 0 && a === 'wrap' && amt > b.pub) { amountError = true; amountErrorText = 'Exceeds your public ' + p.sym + ' balance.'; }
+    if (amt > 0 && a === 'unwrap' && amt > b.priv) { amountError = true; amountErrorText = 'Exceeds your private ' + p.csym + ' balance.'; }
+
+    const primaryLabel = !connected
+      ? (a === 'wrap' ? 'Connect & shield' : a === 'unwrap' ? 'Connect & unshield' : 'Connect & mint')
+      : (a === 'wrap' ? 'Shield balance' : a === 'unwrap' ? 'Unshield balance' : 'Get test tokens');
+    const primaryStyle = 'display:inline-flex;align-items:center;justify-content:center;min-height:54px;border:none;border-radius:10px;background:#FFD208;color:#000;font-size:0.98rem;font-weight:900;font-family:Inter,sans-serif;transition:opacity 160ms ease;'
+      + 'cursor:' + (disabled ? 'not-allowed' : 'pointer') + ';opacity:' + (disabled ? '0.42' : '1') + ';';
+
+    // progress steps render
+    const pdefs = this.progressDefs();
+    const progressSteps = pdefs.map((d, i) => ({
+      n: i + 1, label: d.label,
+      isDone: i < tx.step, isActive: i === tx.step, isPending: i > tx.step,
+      color: i < tx.step ? '#e8e8e8' : i === tx.step ? '#fff' : '#666'
+    }));
+    const runningHeading = a === 'wrap' ? 'Shielding ' + p.sym : a === 'unwrap' ? 'Unshielding ' + p.csym : 'Minting ' + p.sym;
+    const doneTitles = { wrap: p.sym + ' shielded', unwrap: p.csym + ' unshielded', claimFaucet: 'Test tokens received' };
+    const doneDetails = {
+      wrap: 'Your ' + p.csym + ' position is now private.',
+      unwrap: this.fmt(amt, p.dec) + ' ' + p.sym + ' is back in your public balance.',
+      claimFaucet: this.fmt(amt, p.dec) + ' ' + p.sym + ' minted to your wallet.'
+    };
+
+    // reveal steps render
+    const rdefs = this.revealDefs();
+    const revealSteps = rdefs.map((d, i) => ({
+      n: i + 1, label: d.label,
+      isDone: i < rv.step, isActive: i === rv.step, isPending: i > rv.step,
+      color: i < rv.step ? '#e8e8e8' : i === rv.step ? '#fff' : '#666'
+    }));
+
+    // asset sheet
+    const filterTabs = [
+      { key: 'all', label: 'All' }, { key: 'test', label: 'Test tokens' }, { key: 'private', label: 'Private' }
+    ].map(f => ({ label: f.label, onSelect: () => this.setFilter(f.key), active: this.state.filter === f.key, inactive: this.state.filter !== f.key }));
+    const q = this.state.query.trim().toLowerCase();
+    const filteredPairs = this.PAIRS.filter(x => {
+      const okq = !q || (x.sym + ' ' + x.csym + ' ' + x.name).toLowerCase().includes(q);
+      const okf = this.state.filter === 'all' || (this.state.filter === 'test' && x.faucet) || (this.state.filter === 'private');
+      return okq && okf;
+    }).map(x => {
+      const tags = [];
+      if (x.faucet) tags.push({ label: 'Test', style: this.tagStyle('accent') }); else tags.push({ label: 'Restricted', style: this.tagStyle('muted') });
+      if (x.testOnly) tags.push({ label: 'Test only', style: this.tagStyle('warn') });
+      return {
+        onSelect: () => this.selectPair(x.id),
+        sym: x.sym, csym: x.csym, name: x.name, mono: x.sym.slice(0, 2).toUpperCase(),
+        tags,
+        rowStyle: 'display:flex;align-items:center;gap:12px;width:100%;min-height:64px;padding:11px 12px;border-radius:11px;color:#fff;cursor:pointer;font-family:Inter,sans-serif;transition:background 140ms ease;'
+          + 'border:1px solid ' + (x.id === this.state.selectedId ? 'rgba(255,210,8,0.5)' : 'transparent') + ';'
+          + 'background:' + (x.id === this.state.selectedId ? 'rgba(255,210,8,0.07)' : 'transparent') + ';'
+      };
+    });
+
+    // wallet button
+    const walletLabel = connected ? this.shortAddr('0x7A3fD41 b6C9221'.replace(/\s/g, '')) : 'Connect wallet';
+    const walletBtnStyle = 'display:inline-flex;align-items:center;gap:8px;min-height:38px;padding:0 14px;border-radius:8px;font-size:0.82rem;font-weight:800;cursor:pointer;font-family:Inter,sans-serif;transition:all 160ms ease;'
+      + 'border:1px solid ' + (connected ? 'rgba(255,255,255,0.16)' : 'rgba(255,210,8,0.65)') + ';'
+      + 'background:' + (connected ? 'rgba(255,255,255,0.03)' : '#FFD208') + ';color:' + (connected ? '#fff' : '#000') + ';';
+
+    const planTitleMap = { wrap: 'Shield (wrap)', unwrap: 'Unshield (unwrap)', decryptBalance: 'Reveal (decrypt)', claimFaucet: 'Get test tokens (faucet)' };
+
+    return {
+      showApp: screen === 'app', showLanding: screen === 'landing',
+      enterApp: () => this.go('app'), goHome: () => this.go('landing'),
+      toggleWallet: () => this.toggleWallet(), walletShort: this.shortAddr('0x7A3fD41b6C9221'),
+      connectedBool: connected, disconnectedBool: !connected,
+      togglePlan: () => this.setState({ planDrawerOpen: !this.state.planDrawerOpen }),
+      planOpen: this.state.planDrawerOpen,
+      stop: (e) => { if (e && e.stopPropagation) e.stopPropagation(); },
+
+      actionEyebrow: eyebrows[a], actionTitle: titles[a], actionSubtitle: subtitles[a],
+      tabWrap: () => this.selectAction('wrap'), tabUnwrap: () => this.selectAction('unwrap'),
+      tabReveal: () => this.selectAction('decryptBalance'), tabFaucet: () => { if (p.faucet) this.selectAction('claimFaucet'); },
+      wrapActive: a === 'wrap', wrapInactive: a !== 'wrap',
+      unwrapActive: a === 'unwrap', unwrapInactive: a !== 'unwrap',
+      revealActive: a === 'decryptBalance', revealInactive: a !== 'decryptBalance',
+      faucetActive: a === 'claimFaucet', faucetInactive: a !== 'claimFaucet' && p.faucet, faucetDisabled: !p.faucet,
+
+      selMono: p.sym.slice(0, 2).toUpperCase(), selSym: p.sym, selCsym: p.csym, selName: p.name,
+      selPubBal: this.fmt(b.pub, p.dec),
+      openSheet: () => this.setState({ assetSheetOpen: true, query: '' }),
+
+      isAmountFlow: !reveal, isReveal: reveal,
+      txIdle: tx.status === 'idle', txRunning: tx.status === 'running', txDone: tx.status === 'done',
+      amountLabel, amount: this.state.amount, setAmount: (e) => this.setAmount(e), setMax: () => this.setMax(),
+      fromSym, amountError, amountErrorText,
+      previewSendLabel, previewReceiveLabel, previewSend, previewReceive, previewNote,
+      hasRefund, refundStr: hasRefund ? this.fmtRefund(refund) + ' ' + p.sym : '',
+      primaryLabel, primaryDisabled: disabled, primaryEnabled: !disabled, startTx: () => this.startTx(),
+      runningHeading, progressSteps,
+      doneTitle: doneTitles[a] || 'Done', doneDetail: doneDetails[a] || '', resetFlow: () => this.resetFlow(),
+
+      revealHidden: rv.status === 'hidden', revealRunning: rv.status === 'running', revealShown: rv.status === 'shown',
+      revealCta: connected ? 'Sign & reveal' : 'Connect & reveal', revealValue: rv.value || '',
+      runReveal: () => this.runReveal(), hideReveal: () => this.hideReveal(), revealSteps,
+
+      showActivityPanel: (this.props.showActivity !== false), activity: this.state.activity,
+
+      assetOpen: this.state.assetSheetOpen, closeSheet: () => this.setState({ assetSheetOpen: false }),
+      query: this.state.query, setQuery: (e) => this.setQuery(e), filterTabs, filteredPairs,
+
+      planTitle: planTitleMap[a], planSteps: this.planStepsFor()
+    };
+  }
+}
+</script>
+</body>
+</html>

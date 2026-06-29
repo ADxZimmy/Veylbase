@@ -1,0 +1,35 @@
+{
+  "name": "veylbase",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A production-ready Zama confidential wrapper registry dApp foundation.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint . --max-warnings=0",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@zama-fhe/react-sdk": "^3.1.0",
+    "@zama-fhe/sdk": "^3.1.0",
+    "lucide-react": "^1.21.0",
+    "next": "^16.2.9",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "viem": "^2.43.0",
+    "zod": "^4.2.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.18",
+    "@types/node": "^24.10.1",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "eslint": "^9.39.2",
+    "eslint-config-next": "^16.2.9",
+    "tailwindcss": "^4.1.18",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.15"
+  }
+}

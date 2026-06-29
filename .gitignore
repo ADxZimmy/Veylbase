@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+
+# Next.js
+.next/
+out/
+
+# Production
+dist/
+build/
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Local verification artifacts
+.playwright-cli/
+output/playwright/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Design import artifacts (unpacked reference kept under design-system-review-request/)
+*-handoff.zip
