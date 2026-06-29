@@ -298,6 +298,19 @@ button:disabled {
   font-weight: 600;
 }
 
+.vb-network-warn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.vb-network-warn .vb-ghost {
+  color: var(--danger-soft);
+  border-color: rgba(255, 107, 107, 0.4);
+}
+
 .vb-column {
   width: 100%;
   max-width: 720px;

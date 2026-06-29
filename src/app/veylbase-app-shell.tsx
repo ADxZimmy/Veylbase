@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ChevronDown,
   Code2,
@@ -15,19 +15,25 @@ import {
   X
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { parseUnits } from "viem";
+import { getAddress, parseUnits } from "viem";
 import type {
   ActionPlanKey,
   UiRegistryChain,
   UiRegistryPair,
   UiRegistrySnapshot
 } from "./app-types";
+import {
+  readPublicBalance,
+  SEPOLIA_HEX_CHAIN_ID,
+  type TokenBalance
+} from "./chain-reads";
 
 type FilterKey = "all" | "test" | "private";
 
 interface EthereumProvider {
   request(args: { method: string; params?: unknown[] }): Promise<unknown>;
   on?(event: string, handler: (...args: unknown[]) => void): void;
+  removeListener?(event: string, handler: (...args: unknown[]) => void): void;
 }
 
 interface VeylbaseAppShellProps {
@@ -140,13 +146,18 @@ export function VeylbaseAppShell({
   const [planError, setPlanError] = useState<string | null>(null);
   const [plan, setPlan] = useState<PlanData | null>(null);
   const [account, setAccount] = useState<string | null>(null);
+  const [chainId, setChainId] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
   const [walletError, setWalletError] = useState<string | null>(null);
   const [activity, setActivity] = useState<ActivityEvent[]>([]);
+  const [balances, setBalances] = useState<Record<string, TokenBalance>>({});
 
   const pairs = snapshot.pairs;
   const selectedPair =
     pairs.find((pair) => pair.id === selectedPairId) ?? pairs[0];
+  const onSepolia = chainId === SEPOLIA_HEX_CHAIN_ID;
+  const wrongNetwork = account != null && chainId != null && !onSepolia;
+  const publicBalance = balances[selectedPairId];
 
   const pushActivity = useCallback((title: string, tone: ActivityEvent["tone"]) => {
     setActivity((current) =>
@@ -169,7 +180,9 @@ export function VeylbaseAppShell({
         method: "eth_requestAccounts"
       })) as string[];
       const next = accounts?.[0] ?? null;
+      const currentChain = (await ethereum.request({ method: "eth_chainId" })) as string;
       setAccount(next);
+      setChainId(currentChain);
       if (next) pushActivity(`Wallet connected · ${shortAddress(next)}`, "success");
     } catch {
       setWalletError("Wallet connection was rejected.");
@@ -180,9 +193,73 @@ export function VeylbaseAppShell({
 
   const disconnect = useCallback(() => {
     setAccount(null);
+    setChainId(null);
+    setBalances({});
     setPlan(null);
     pushActivity("Wallet disconnected", "neutral");
   }, [pushActivity]);
+
+  const switchToSepolia = useCallback(async () => {
+    const ethereum = getEthereum();
+    if (!ethereum) return;
+    try {
+      await ethereum.request({
+        method: "wallet_switchEthereumChain",
+        params: [{ chainId: SEPOLIA_HEX_CHAIN_ID }]
+      });
+      setChainId(SEPOLIA_HEX_CHAIN_ID);
+    } catch {
+      setWalletError("Could not switch the wallet to Sepolia.");
+    }
+  }, []);
+
+  // Keep account / chain in sync with the injected wallet.
+  useEffect(() => {
+    const ethereum = getEthereum();
+    if (!ethereum?.on || !ethereum.removeListener) return;
+    const onAccounts = (...args: unknown[]) => {
+      const next = (args[0] as string[] | undefined)?.[0] ?? null;
+      setAccount(next);
+      if (!next) {
+        setChainId(null);
+        setBalances({});
+      }
+    };
+    const onChain = (...args: unknown[]) => {
+      setChainId((args[0] as string) ?? null);
+      setBalances({});
+    };
+    ethereum.on("accountsChanged", onAccounts);
+    ethereum.on("chainChanged", onChain);
+    return () => {
+      ethereum.removeListener?.("accountsChanged", onAccounts);
+      ethereum.removeListener?.("chainChanged", onChain);
+    };
+  }, []);
+
+  // Read the real public balance for the selected pair once connected on Sepolia.
+  useEffect(() => {
+    if (!account || !onSepolia || !selectedPair) return;
+    if (balances[selectedPair.id]) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const balance = await readPublicBalance(
+          getAddress(selectedPair.underlyingAddress),
+          getAddress(account),
+          selectedPair.decimals
+        );
+        if (!cancelled) {
+          setBalances((current) => ({ ...current, [selectedPair.id]: balance }));
+        }
+      } catch {
+        // Leave the balance unread; the UI keeps the honest placeholder.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [account, balances, onSepolia, selectedPair]);
 
   const selectAction = useCallback((next: ActionPlanKey) => {
     setAction(next);
@@ -253,11 +330,33 @@ export function VeylbaseAppShell({
     if (action === "claimFaucet" && amountNumber > FAUCET_PER_CALL_LIMIT) {
       return "Faucet mints up to 1,000,000 tokens per call.";
     }
+    if (
+      action === "wrap" &&
+      publicBalance &&
+      amountNumber > Number(publicBalance.formatted)
+    ) {
+      return `Exceeds your public ${selectedPair?.symbol ?? ""} balance.`;
+    }
     return null;
-  }, [action, amountNumber]);
+  }, [action, amountNumber, publicBalance, selectedPair]);
 
   const primaryDisabled =
     !isReveal && (amountNumber <= 0 || amountErrorText != null);
+
+  const maxDisabled =
+    (action === "wrap" && !publicBalance) ||
+    action === "unwrap" ||
+    action === "decryptBalance";
+
+  const setMax = useCallback(() => {
+    if (action === "claimFaucet") {
+      setAmount(String(FAUCET_PER_CALL_LIMIT));
+      return;
+    }
+    if (action === "wrap" && publicBalance) {
+      setAmount(publicBalance.formatted);
+    }
+  }, [action, publicBalance]);
 
   const generatePlan = useCallback(
     async (intent: ActionPlanKey) => {
@@ -319,8 +418,12 @@ export function VeylbaseAppShell({
       void connect();
       return;
     }
+    if (wrongNetwork) {
+      void switchToSepolia();
+      return;
+    }
     void generatePlan(action);
-  }, [account, action, connect, generatePlan]);
+  }, [account, action, connect, generatePlan, switchToSepolia, wrongNetwork]);
 
   const openPlanDrawer = useCallback(() => {
     setPlanOpen(true);
@@ -337,6 +440,13 @@ export function VeylbaseAppShell({
   const amountLabel =
     action === "unwrap" ? "Amount to unshield" : action === "claimFaucet" ? "Amount to mint" : "Amount to shield";
   const fromSymbol = action === "unwrap" ? selectedPair.confidentialSymbol : selectedPair.symbol;
+  const publicBalanceDisplay = !account
+    ? "Connect"
+    : wrongNetwork
+      ? "Wrong network"
+      : publicBalance
+        ? formatAmount(Number(publicBalance.formatted), selectedPair.decimals)
+        : "…";
 
   return (
     <main className="vb-app">
@@ -350,6 +460,15 @@ export function VeylbaseAppShell({
       />
 
       {walletError ? <div className="vb-wallet-error" role="alert">{walletError}</div> : null}
+
+      {wrongNetwork ? (
+        <div className="vb-wallet-error vb-network-warn" role="alert">
+          <span>Your wallet is on the wrong network. Veylbase runs on Sepolia.</span>
+          <button className="vb-ghost" onClick={switchToSepolia} type="button">
+            Switch to Sepolia
+          </button>
+        </div>
+      ) : null}
 
       <div className="vb-column">
         <header className="vb-heading">
@@ -398,7 +517,7 @@ export function VeylbaseAppShell({
             <span className="vb-asset-bal">
               <small>Public · Private</small>
               <span>
-                {account ? "—" : "Connect"} <span className="vb-accent">· ••••••</span>
+                {publicBalanceDisplay} <span className="vb-accent">· ••••••</span>
               </span>
             </span>
             <span className="vb-change">
@@ -422,8 +541,13 @@ export function VeylbaseAppShell({
                     <span>{amountLabel}</span>
                     <button
                       className="vb-max"
-                      disabled
-                      title="Connect a wallet to read your balance"
+                      disabled={maxDisabled}
+                      onClick={setMax}
+                      title={
+                        action === "unwrap"
+                          ? "Private balance is revealed via decrypt"
+                          : "Use your full balance"
+                      }
                       type="button"
                     >
                       MAX
