@@ -9,10 +9,9 @@ import type {
   RegistrySourceHealth
 } from "@/lib/registry/types";
 import { loadLocalRegistryPairs } from "@/server/registry/local-config";
-import {
-  getOnchainRegistryPage,
-  type SerializableOnchainPair
-} from "@/server/registry/onchain";
+// `onchain` pulls in @zama-fhe/sdk (heavy). It is imported dynamically inside the
+// live branch below so non-live callers — and the test suite — never load it.
+import type { SerializableOnchainPair } from "@/server/registry/onchain";
 
 interface RegistrySnapshotOptions {
   includeLocal?: boolean;
@@ -179,6 +178,9 @@ export async function getRegistrySnapshot(
 
   if (options.live) {
     try {
+      const { getOnchainRegistryPage } = await import(
+        "@/server/registry/onchain"
+      );
       const live = await getOnchainRegistryPage({
         page: options.page,
         pageSize: options.pageSize,

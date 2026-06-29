@@ -1,35 +1,9 @@
-import type { RegistryPair } from "@/lib/registry/types";
 import { getRegistrySnapshot } from "@/server/registry/service";
-import type { UiRegistryPair, UiRegistrySnapshot } from "../app-types";
+import type { UiRegistrySnapshot } from "../app-types";
+import { toUiPair } from "../registry-view";
 import { VeylbaseAppShell } from "../veylbase-app-shell";
 
 export const dynamic = "force-dynamic";
-
-/** Trim the "Mock" suffix used in the snapshot symbols (USDCMock -> USDC). */
-function cleanSymbol(value: string) {
-  return value.replace(/Mock$/u, "");
-}
-
-function isTestOnly(pair: RegistryPair) {
-  return pair.notes.some((note) =>
-    /only for testing|not the real/iu.test(note)
-  );
-}
-
-function toUiPair(pair: RegistryPair): UiRegistryPair {
-  return {
-    id: pair.id,
-    symbol: cleanSymbol(pair.underlying.symbol),
-    confidentialSymbol: cleanSymbol(pair.confidential.symbol),
-    name: pair.underlying.name,
-    decimals: pair.underlying.decimals,
-    underlyingAddress: pair.underlying.address,
-    confidentialAddress: pair.confidential.address,
-    faucet: pair.capabilities.faucet,
-    mock: pair.mock,
-    testOnly: isTestOnly(pair)
-  };
-}
 
 export default async function VeylbaseApp() {
   const registry = await getRegistrySnapshot({ live: true, pageSize: 20 });
