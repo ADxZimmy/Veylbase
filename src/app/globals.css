@@ -535,6 +535,20 @@ button:disabled {
 .vb-flow {
   display: grid;
   gap: 16px;
+  min-width: 0;
+}
+
+/* Let the action-card grid/flex items shrink below their content's intrinsic
+   width instead of overflowing the card (and being clipped) on narrow screens.
+   Without this, the amount input and preview rows force the card wider than the
+   viewport. */
+.vb-flow > *,
+.vb-field,
+.vb-field-top,
+.vb-amount,
+.vb-preview,
+.vb-preview-row {
+  min-width: 0;
 }
 
 .vb-field {
@@ -1330,53 +1344,41 @@ button:disabled {
 @media (max-width: 680px) {
   .vb-app,
   .vb-landing {
-    width: 100%;
-    max-width: 100vw;
     padding: 16px 16px 56px;
-    overflow-x: hidden;
   }
 
-  .vb-topbar {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    width: calc(100vw - 32px);
-    max-width: calc(100vw - 32px);
-  }
-
+  /* Let every flex/grid child shrink instead of forcing horizontal overflow. */
   .vb-brand,
   .vb-brand-name,
   .vb-column,
-  .vb-card {
+  .vb-card,
+  .vb-topnav > * {
     min-width: 0;
+  }
+
+  /* Stack the top bar: brand on its own row, session controls below. */
+  .vb-topbar {
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .vb-topnav {
     display: grid;
-    grid-template-columns: minmax(0, 1fr);
-    width: calc(100vw - 32px);
-    max-width: calc(100vw - 32px);
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
   }
 
-  .vb-topnav > * {
-    min-width: 0;
+  .vb-chain {
+    grid-column: 1 / -1;
     justify-content: center;
   }
 
+  .vb-ghost,
   .vb-connect {
     width: 100%;
-  }
-
-  .vb-ghost,
-  .vb-chain {
-    width: 100%;
+    justify-content: center;
     padding-inline: 10px;
-    font-size: 0.78rem;
-  }
-
-  .vb-column {
-    width: calc(100vw - 32px);
-    max-width: calc(100vw - 32px);
-    overflow: hidden;
+    font-size: 0.8rem;
   }
 
   .vb-heading h1 {
@@ -1385,29 +1387,25 @@ button:disabled {
 
   .vb-tabs {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    width: calc(100vw - 32px);
-    max-width: calc(100vw - 32px);
-  }
-
-  .vb-card,
-  .vb-activity {
-    width: calc(100vw - 32px);
-    max-width: calc(100vw - 32px);
   }
 
   .vb-tab {
-    min-width: 0;
-    width: 100%;
-    overflow: hidden;
     font-size: 0.8rem;
     gap: 5px;
   }
 
+  /* Asset row: badge | identity (+ balance under it) | change control. */
   .vb-asset-select {
     display: grid;
-    grid-template-columns: 44px minmax(0, 1fr) 38px;
+    grid-template-columns: 44px minmax(0, 1fr) auto;
     gap: 10px;
     padding: 14px;
+  }
+
+  .vb-asset-id small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .vb-asset-bal {
@@ -1418,16 +1416,6 @@ button:disabled {
   .vb-change {
     grid-column: 3;
     grid-row: 1;
-    justify-content: center;
-    width: 38px;
-    height: 34px;
-    padding: 0;
-    font-size: 0;
-  }
-
-  .vb-change svg {
-    width: 15px;
-    height: 15px;
   }
 
   .vb-execution {
@@ -1436,19 +1424,6 @@ button:disabled {
 
   .vb-execution-link {
     grid-column: 2;
-  }
-
-  .vb-preview-row {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 12px;
-  }
-
-  .vb-preview {
-    width: 100%;
-    max-width: 100%;
-    padding: 14px;
-    overflow: hidden;
   }
 
   .vb-flow-band {

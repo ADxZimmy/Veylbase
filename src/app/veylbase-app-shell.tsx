@@ -27,14 +27,13 @@ import {
   SEPOLIA_HEX_CHAIN_ID,
   type TokenBalance
 } from "./chain-reads";
-import {
-  executeFaucetMint,
-  executeShield,
-  executeUnshield,
-  executionErrorMessage,
-  revealConfidentialBalance,
-  type BrowserEthereumProvider,
-  type ExecutionProgress
+import { executionErrorMessage } from "./execution-errors";
+// The execution functions pull in @zama-fhe/sdk (large). They are imported
+// dynamically inside runAction so the SDK stays out of the initial /app bundle;
+// only the (erased) types are imported statically here.
+import type {
+  BrowserEthereumProvider,
+  ExecutionProgress
 } from "./confidential-actions";
 
 type FilterKey = "all" | "test" | "private";
@@ -514,6 +513,8 @@ export function VeylbaseAppShell({
     });
 
     try {
+      // Load the SDK-heavy execution module on first use only.
+      const actions = await import("./confidential-actions");
       const nextPlan = await buildPlan(action);
       setPlan(nextPlan);
 
@@ -526,7 +527,7 @@ export function VeylbaseAppShell({
       };
 
       if (action === "decryptBalance") {
-        const revealed = await revealConfidentialBalance({
+        const revealed = await actions.revealConfidentialBalance({
           account: walletAccount,
           callbacks: { onProgress },
           provider,
@@ -572,16 +573,16 @@ export function VeylbaseAppShell({
       };
       const result =
         action === "claimFaucet"
-          ? await executeFaucetMint({
+          ? await actions.executeFaucetMint({
               ...common,
               tokenAddress: getAddress(selectedPair.underlyingAddress)
             })
           : action === "wrap"
-            ? await executeShield({
+            ? await actions.executeShield({
                 ...common,
                 wrapperAddress: getAddress(selectedPair.confidentialAddress)
               })
-            : await executeUnshield({
+            : await actions.executeUnshield({
                 ...common,
                 wrapperAddress: getAddress(selectedPair.confidentialAddress)
               });
