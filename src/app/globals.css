@@ -465,6 +465,73 @@ button:disabled {
   padding: 20px 18px 22px;
 }
 
+.vb-execution {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 12px;
+  align-items: center;
+  margin-top: 14px;
+  padding: 12px 13px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.vb-execution.is-running {
+  border-color: rgba(255, 210, 8, 0.32);
+  background: rgba(255, 210, 8, 0.055);
+}
+
+.vb-execution.is-success {
+  border-color: rgba(65, 209, 139, 0.32);
+  background: rgba(65, 209, 139, 0.07);
+}
+
+.vb-execution.is-error {
+  border-color: rgba(255, 107, 107, 0.36);
+  background: rgba(255, 107, 107, 0.07);
+}
+
+.vb-execution-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: var(--accent);
+}
+
+.vb-execution.is-success .vb-execution-dot {
+  background: var(--success);
+}
+
+.vb-execution.is-error .vb-execution-dot {
+  background: var(--danger);
+}
+
+.vb-execution-copy {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.vb-execution-copy strong {
+  color: var(--text-bright);
+  font-size: 0.88rem;
+}
+
+.vb-execution-copy small {
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.vb-execution-link,
+.vb-activity-link {
+  color: var(--accent);
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-decoration: none;
+}
+
 .vb-flow {
   display: grid;
   gap: 16px;
@@ -628,6 +695,13 @@ button:disabled {
   color: var(--accent);
 }
 
+.vb-reveal-hidden.is-revealed {
+  max-width: 100%;
+  font-size: clamp(1.8rem, 7vw, 2.6rem);
+  letter-spacing: 0;
+  overflow-wrap: anywhere;
+}
+
 .vb-reveal-hint {
   display: inline-flex;
   align-items: center;
@@ -676,19 +750,28 @@ button:disabled {
 
 .vb-activity-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 11px;
 }
 
 .vb-activity-text {
+  display: grid;
+  gap: 3px;
   flex: 1;
   min-width: 0;
-  font-size: 0.88rem;
-  font-weight: 700;
+}
+
+.vb-activity-text strong {
   color: var(--text-bright);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  font-size: 0.88rem;
+  font-weight: 800;
+}
+
+.vb-activity-text small {
+  color: var(--muted-2);
+  font-size: 0.76rem;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 /* ---------- overlays ---------- */
@@ -1247,20 +1330,125 @@ button:disabled {
 @media (max-width: 680px) {
   .vb-app,
   .vb-landing {
+    width: 100%;
+    max-width: 100vw;
     padding: 16px 16px 56px;
+    overflow-x: hidden;
+  }
+
+  .vb-topbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    width: calc(100vw - 32px);
+    max-width: calc(100vw - 32px);
+  }
+
+  .vb-brand,
+  .vb-brand-name,
+  .vb-column,
+  .vb-card {
+    min-width: 0;
+  }
+
+  .vb-topnav {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    width: calc(100vw - 32px);
+    max-width: calc(100vw - 32px);
+  }
+
+  .vb-topnav > * {
+    min-width: 0;
+    justify-content: center;
+  }
+
+  .vb-connect {
+    width: 100%;
+  }
+
+  .vb-ghost,
+  .vb-chain {
+    width: 100%;
+    padding-inline: 10px;
+    font-size: 0.78rem;
+  }
+
+  .vb-column {
+    width: calc(100vw - 32px);
+    max-width: calc(100vw - 32px);
+    overflow: hidden;
   }
 
   .vb-heading h1 {
     font-size: 1.7rem;
   }
 
+  .vb-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: calc(100vw - 32px);
+    max-width: calc(100vw - 32px);
+  }
+
+  .vb-card,
+  .vb-activity {
+    width: calc(100vw - 32px);
+    max-width: calc(100vw - 32px);
+  }
+
   .vb-tab {
+    min-width: 0;
+    width: 100%;
+    overflow: hidden;
     font-size: 0.8rem;
     gap: 5px;
   }
 
+  .vb-asset-select {
+    display: grid;
+    grid-template-columns: 44px minmax(0, 1fr) 38px;
+    gap: 10px;
+    padding: 14px;
+  }
+
   .vb-asset-bal {
-    display: none;
+    grid-column: 2 / -1;
+    text-align: left;
+  }
+
+  .vb-change {
+    grid-column: 3;
+    grid-row: 1;
+    justify-content: center;
+    width: 38px;
+    height: 34px;
+    padding: 0;
+    font-size: 0;
+  }
+
+  .vb-change svg {
+    width: 15px;
+    height: 15px;
+  }
+
+  .vb-execution {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .vb-execution-link {
+    grid-column: 2;
+  }
+
+  .vb-preview-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 12px;
+  }
+
+  .vb-preview {
+    width: 100%;
+    max-width: 100%;
+    padding: 14px;
+    overflow: hidden;
   }
 
   .vb-flow-band {

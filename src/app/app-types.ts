@@ -18,8 +18,15 @@ export interface UiRegistryPair {
   confidentialSymbol: string;
   /** Human label for the underlying token, e.g. "USDC Mock". */
   name: string;
-  /** On-chain decimals, or null until live registry metadata is loaded. */
+  /** Underlying ERC-20 decimals, or null until live registry metadata is loaded. */
   decimals: number | null;
+  /**
+   * Confidential (ERC-7984) token decimals, or null until live metadata loads.
+   * Often differs from {@link decimals} — e.g. WETH is 18 underlying / 6
+   * confidential. Use this for every confidential-side amount (reveal display,
+   * private-balance validation, unwrap input), never the underlying decimals.
+   */
+  confidentialDecimals: number | null;
   underlyingAddress: string;
   confidentialAddress: string;
   /** True when the underlying exposes the public mock faucet mint. */

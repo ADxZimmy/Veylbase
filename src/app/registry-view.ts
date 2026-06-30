@@ -19,6 +19,7 @@ export function toUiPair(pair: RegistryPair): UiRegistryPair {
     confidentialSymbol: cleanSymbol(pair.confidential.symbol),
     name: pair.underlying.name,
     decimals: pair.underlying.decimals,
+    confidentialDecimals: pair.confidential.decimals,
     underlyingAddress: pair.underlying.address,
     confidentialAddress: pair.confidential.address,
     faucet: pair.capabilities.faucet,

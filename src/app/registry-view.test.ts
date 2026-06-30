@@ -42,6 +42,22 @@ describe("registry-view mapping", () => {
 
   it("preserves null decimals from the static snapshot", () => {
     // The checked-in snapshot leaves decimals null; they are filled from chain.
-    expect(toUiPair(pair("usdc-mock-sepolia")).decimals).toBeNull();
+    const ui = toUiPair(pair("usdc-mock-sepolia"));
+    expect(ui.decimals).toBeNull();
+    expect(ui.confidentialDecimals).toBeNull();
+  });
+
+  it("carries underlying and confidential decimals separately", () => {
+    // Live WETH is 18 underlying / 6 confidential — they must not be conflated,
+    // or reveal/unshield amounts are off by ~10^12. Simulate populated metadata.
+    const weth = pair("weth-mock-sepolia");
+    const populated = {
+      ...weth,
+      underlying: { ...weth.underlying, decimals: 18 },
+      confidential: { ...weth.confidential, decimals: 6 }
+    };
+    const ui = toUiPair(populated);
+    expect(ui.decimals).toBe(18);
+    expect(ui.confidentialDecimals).toBe(6);
   });
 });

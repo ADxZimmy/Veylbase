@@ -15,7 +15,7 @@ import {
   X
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { getAddress, parseUnits } from "viem";
+import { formatUnits, getAddress, parseUnits, type Hex } from "viem";
 import type {
   ActionPlanKey,
   UiRegistryChain,
@@ -27,14 +27,17 @@ import {
   SEPOLIA_HEX_CHAIN_ID,
   type TokenBalance
 } from "./chain-reads";
+import {
+  executeFaucetMint,
+  executeShield,
+  executeUnshield,
+  executionErrorMessage,
+  revealConfidentialBalance,
+  type BrowserEthereumProvider,
+  type ExecutionProgress
+} from "./confidential-actions";
 
 type FilterKey = "all" | "test" | "private";
-
-interface EthereumProvider {
-  request(args: { method: string; params?: unknown[] }): Promise<unknown>;
-  on?(event: string, handler: (...args: unknown[]) => void): void;
-  removeListener?(event: string, handler: (...args: unknown[]) => void): void;
-}
 
 interface VeylbaseAppShellProps {
   defaultPairId: string;
@@ -42,9 +45,11 @@ interface VeylbaseAppShellProps {
 }
 
 interface ActivityEvent {
-  id: number;
+  id: string;
   title: string;
   tone: "neutral" | "accent" | "success";
+  detail?: string;
+  txHash?: Hex;
 }
 
 interface PlanStep {
@@ -62,6 +67,15 @@ interface PlanData {
   intent: string;
   steps: PlanStep[];
   warnings: string[];
+}
+
+interface PrivateBalance {
+  raw: bigint;
+  formatted: string;
+}
+
+interface ExecutionState extends ExecutionProgress {
+  status: "running" | "success" | "error";
 }
 
 const actionTabs: Array<{ key: ActionPlanKey; label: string; Icon: LucideIcon }> = [
@@ -126,9 +140,9 @@ function trimZeros(value: string) {
   return value.replace(/0+$/u, "").replace(/\.$/u, "");
 }
 
-function getEthereum(): EthereumProvider | undefined {
+function getEthereum(): BrowserEthereumProvider | undefined {
   if (typeof window === "undefined") return undefined;
-  return (window as unknown as { ethereum?: EthereumProvider }).ethereum;
+  return (window as unknown as { ethereum?: BrowserEthereumProvider }).ethereum;
 }
 
 export function VeylbaseAppShell({
@@ -151,6 +165,10 @@ export function VeylbaseAppShell({
   const [walletError, setWalletError] = useState<string | null>(null);
   const [activity, setActivity] = useState<ActivityEvent[]>([]);
   const [balances, setBalances] = useState<Record<string, TokenBalance>>({});
+  const [privateBalances, setPrivateBalances] = useState<Record<string, PrivateBalance>>({});
+  const [balanceRefreshKey, setBalanceRefreshKey] = useState(0);
+  const [execution, setExecution] = useState<ExecutionState | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const pairs = snapshot.pairs;
   const selectedPair =
@@ -158,10 +176,26 @@ export function VeylbaseAppShell({
   const onSepolia = chainId === SEPOLIA_HEX_CHAIN_ID;
   const wrongNetwork = account != null && chainId != null && !onSepolia;
   const publicBalance = balances[selectedPairId];
+  const privateBalance = privateBalances[selectedPairId];
+  const executing = execution?.status === "running";
 
-  const pushActivity = useCallback((title: string, tone: ActivityEvent["tone"]) => {
+  const pushActivity = useCallback((
+    title: string,
+    tone: ActivityEvent["tone"],
+    detail?: string,
+    txHash?: Hex
+  ) => {
     setActivity((current) =>
-      [{ id: current.length + 1, title, tone }, ...current].slice(0, 6)
+      [
+        {
+          id: `${Date.now()}-${current.length}`,
+          title,
+          tone,
+          detail,
+          txHash
+        },
+        ...current
+      ].slice(0, 6)
     );
   }, []);
 
@@ -195,7 +229,10 @@ export function VeylbaseAppShell({
     setAccount(null);
     setChainId(null);
     setBalances({});
+    setPrivateBalances({});
     setPlan(null);
+    setExecution(null);
+    setActionError(null);
     pushActivity("Wallet disconnected", "neutral");
   }, [pushActivity]);
 
@@ -223,11 +260,19 @@ export function VeylbaseAppShell({
       if (!next) {
         setChainId(null);
         setBalances({});
+        setPrivateBalances({});
       }
+      setPlan(null);
+      setExecution(null);
+      setActionError(null);
     };
     const onChain = (...args: unknown[]) => {
       setChainId((args[0] as string) ?? null);
       setBalances({});
+      setPrivateBalances({});
+      setPlan(null);
+      setExecution(null);
+      setActionError(null);
     };
     ethereum.on("accountsChanged", onAccounts);
     ethereum.on("chainChanged", onChain);
@@ -237,10 +282,9 @@ export function VeylbaseAppShell({
     };
   }, []);
 
-  // Read the real public balance for the selected pair once connected on Sepolia.
+  // Read the real public balance for the selected pair and refresh after writes.
   useEffect(() => {
     if (!account || !onSepolia || !selectedPair) return;
-    if (balances[selectedPair.id]) return;
     let cancelled = false;
     void (async () => {
       try {
@@ -259,12 +303,14 @@ export function VeylbaseAppShell({
     return () => {
       cancelled = true;
     };
-  }, [account, balances, onSepolia, selectedPair]);
+  }, [account, balanceRefreshKey, onSepolia, selectedPair]);
 
   const selectAction = useCallback((next: ActionPlanKey) => {
     setAction(next);
     setPlan(null);
     setPlanError(null);
+    setExecution(null);
+    setActionError(null);
   }, []);
 
   const selectPair = useCallback(
@@ -273,6 +319,8 @@ export function VeylbaseAppShell({
       setSelectedPairId(id);
       setAssetSheetOpen(false);
       setPlan(null);
+      setExecution(null);
+      setActionError(null);
       if (action === "claimFaucet" && pair && !pair.faucet) setAction("wrap");
     },
     [action, pairs]
@@ -287,23 +335,29 @@ export function VeylbaseAppShell({
 
   const preview = useMemo(() => {
     if (!selectedPair) return null;
-    const decimals = selectedPair.decimals;
-    const capped =
-      decimals != null && decimals > 6 ? floorTo(amountNumber, 6) : amountNumber;
-    const refund =
-      decimals != null && decimals > 6 ? amountNumber - capped : 0;
+    const underlyingDecimals = selectedPair.decimals;
+    const confDecimals = selectedPair.confidentialDecimals;
+    // Shielding loses precision only when the underlying carries more decimals
+    // than the confidential token can represent.
+    const losesPrecision =
+      underlyingDecimals != null &&
+      confDecimals != null &&
+      underlyingDecimals > confDecimals;
+    const capped = losesPrecision
+      ? floorTo(amountNumber, confDecimals)
+      : amountNumber;
+    const refund = losesPrecision ? amountNumber - capped : 0;
 
     if (action === "wrap") {
       return {
         sendLabel: "You shield",
         send: `${formatPlain(amountNumber)} ${selectedPair.symbol}`,
         receiveLabel: "You receive",
-        receive: `${formatAmount(capped, decimals)} ${selectedPair.confidentialSymbol}`,
+        receive: `${formatAmount(capped, confDecimals)} ${selectedPair.confidentialSymbol}`,
         refund: refund > 0 ? `${trimZeros(refund.toFixed(12))} ${selectedPair.symbol}` : null,
-        note:
-          decimals != null && decimals > 6
-            ? "Wrapped 1:1 · confidential balance is capped at 6 decimals."
-            : "Wrapped 1:1 into a confidential balance."
+        note: losesPrecision
+          ? `Wrapped 1:1 · confidential balance is capped at ${confDecimals} decimals.`
+          : "Wrapped 1:1 into a confidential balance."
       };
     }
     if (action === "unwrap") {
@@ -337,11 +391,18 @@ export function VeylbaseAppShell({
     ) {
       return `Exceeds your public ${selectedPair?.symbol ?? ""} balance.`;
     }
+    if (
+      action === "unwrap" &&
+      privateBalance &&
+      amountNumber > Number(privateBalance.formatted)
+    ) {
+      return `Exceeds your revealed private ${selectedPair?.confidentialSymbol ?? ""} balance.`;
+    }
     return null;
-  }, [action, amountNumber, publicBalance, selectedPair]);
+  }, [action, amountNumber, privateBalance, publicBalance, selectedPair]);
 
   const primaryDisabled =
-    !isReveal && (amountNumber <= 0 || amountErrorText != null);
+    executing || (!isReveal && (amountNumber <= 0 || amountErrorText != null));
 
   const maxDisabled =
     (action === "wrap" && !publicBalance) ||
@@ -358,6 +419,52 @@ export function VeylbaseAppShell({
     }
   }, [action, publicBalance]);
 
+  const buildPlan = useCallback(
+    async (intent: ActionPlanKey) => {
+      if (!selectedPair || !account) {
+        throw new Error("Connect your wallet before building a transaction plan.");
+      }
+
+      let body: Record<string, unknown>;
+      if (intent === "decryptBalance") {
+        body = { intent, pairId: selectedPair.id, account };
+      } else {
+        if (selectedPair.decimals == null) {
+          throw new Error(
+            "Live token decimals are unavailable. Enable the live registry to plan amounts."
+          );
+        }
+        const amountBaseUnits = parseUnits(
+          amount || "0",
+          selectedPair.decimals
+        ).toString();
+        body = {
+          intent,
+          pairId: selectedPair.id,
+          account,
+          amountBaseUnits
+        };
+      }
+
+      const response = await fetch("/api/transactions/plan", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body)
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data?.error ?? "Unable to build transaction plan.");
+      }
+
+      return {
+        intent: data.intent,
+        steps: data.steps ?? [],
+        warnings: data.warnings ?? []
+      } satisfies PlanData;
+    },
+    [account, amount, selectedPair]
+  );
+
   const generatePlan = useCallback(
     async (intent: ActionPlanKey) => {
       if (!selectedPair || !account) return;
@@ -365,41 +472,7 @@ export function VeylbaseAppShell({
       setPlanError(null);
       setPlanOpen(true);
       try {
-        let body: Record<string, unknown>;
-        if (intent === "decryptBalance") {
-          body = { intent, pairId: selectedPair.id, account };
-        } else {
-          if (selectedPair.decimals == null) {
-            throw new Error(
-              "Live token decimals are unavailable. Enable the live registry to plan amounts."
-            );
-          }
-          const amountBaseUnits = parseUnits(
-            amount || "0",
-            selectedPair.decimals
-          ).toString();
-          body = {
-            intent,
-            pairId: selectedPair.id,
-            account,
-            amountBaseUnits
-          };
-        }
-
-        const response = await fetch("/api/transactions/plan", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify(body)
-        });
-        const data = await response.json();
-        if (!response.ok) {
-          throw new Error(data?.error ?? "Unable to build transaction plan.");
-        }
-        setPlan({
-          intent: data.intent,
-          steps: data.steps ?? [],
-          warnings: data.warnings ?? []
-        });
+        setPlan(await buildPlan(intent));
         pushActivity(`Plan generated · ${planTitleByAction[intent]}`, "accent");
       } catch (error) {
         setPlan(null);
@@ -410,10 +483,10 @@ export function VeylbaseAppShell({
         setPlanLoading(false);
       }
     },
-    [account, amount, pushActivity, selectedPair]
+    [account, buildPlan, pushActivity, selectedPair]
   );
 
-  const onPrimary = useCallback(() => {
+  const runAction = useCallback(async () => {
     if (!account) {
       void connect();
       return;
@@ -422,8 +495,142 @@ export function VeylbaseAppShell({
       void switchToSepolia();
       return;
     }
-    void generatePlan(action);
-  }, [account, action, connect, generatePlan, switchToSepolia, wrongNetwork]);
+
+    const provider = getEthereum();
+    if (!provider) {
+      setWalletError(
+        "No EVM wallet detected. Install MetaMask or another browser wallet to continue."
+      );
+      return;
+    }
+    if (!selectedPair) return;
+
+    setActionError(null);
+    setExecution({
+      status: "running",
+      phase: "planning",
+      title: "Checking live plan",
+      detail: "Veylbase is validating the action before opening your wallet."
+    });
+
+    try {
+      const nextPlan = await buildPlan(action);
+      setPlan(nextPlan);
+
+      const walletAccount = getAddress(account);
+      const onProgress = (progress: ExecutionProgress) => {
+        setExecution({ ...progress, status: "running" });
+        if (progress.txHash) {
+          pushActivity(progress.title, "accent", progress.detail, progress.txHash);
+        }
+      };
+
+      if (action === "decryptBalance") {
+        const revealed = await revealConfidentialBalance({
+          account: walletAccount,
+          callbacks: { onProgress },
+          provider,
+          tokenAddress: getAddress(selectedPair.confidentialAddress)
+        });
+        // The decrypted value is in the confidential token's own decimals.
+        const decimals = selectedPair.confidentialDecimals ?? 6;
+        const formatted = formatUnits(revealed.value, decimals);
+        setPrivateBalances((current) => ({
+          ...current,
+          [selectedPair.id]: { raw: revealed.value, formatted }
+        }));
+        setExecution({
+          status: "success",
+          phase: "complete",
+          title: "Private balance revealed",
+          detail: `${formatted} ${selectedPair.confidentialSymbol}`
+        });
+        pushActivity(
+          "Private balance revealed",
+          "success",
+          `${formatted} ${selectedPair.confidentialSymbol}`
+        );
+        return;
+      }
+
+      // shield/faucet take an underlying ERC-20 amount; unshield takes a
+      // confidential-token amount, and the two can have different decimals.
+      const amountDecimals =
+        action === "unwrap"
+          ? selectedPair.confidentialDecimals
+          : selectedPair.decimals;
+      if (amountDecimals == null) {
+        throw new Error("Live token decimals are unavailable.");
+      }
+
+      const amountBaseUnits = parseUnits(amount || "0", amountDecimals);
+      const common = {
+        account: walletAccount,
+        amount: amountBaseUnits,
+        callbacks: { onProgress },
+        provider
+      };
+      const result =
+        action === "claimFaucet"
+          ? await executeFaucetMint({
+              ...common,
+              tokenAddress: getAddress(selectedPair.underlyingAddress)
+            })
+          : action === "wrap"
+            ? await executeShield({
+                ...common,
+                wrapperAddress: getAddress(selectedPair.confidentialAddress)
+              })
+            : await executeUnshield({
+                ...common,
+                wrapperAddress: getAddress(selectedPair.confidentialAddress)
+              });
+
+      setBalances((current) => {
+        const next = { ...current };
+        delete next[selectedPair.id];
+        return next;
+      });
+      setPrivateBalances((current) => {
+        const next = { ...current };
+        delete next[selectedPair.id];
+        return next;
+      });
+      setBalanceRefreshKey((current) => current + 1);
+      setExecution({
+        status: "success",
+        phase: "complete",
+        title: result.title,
+        detail: "Confirmed on Sepolia.",
+        txHash: result.txHash
+      });
+      pushActivity(result.title, "success", "Confirmed on Sepolia.", result.txHash);
+    } catch (error) {
+      const message = executionErrorMessage(error);
+      setActionError(message);
+      setExecution({
+        status: "error",
+        phase: "complete",
+        title: "Action did not complete",
+        detail: message
+      });
+      pushActivity("Action did not complete", "neutral", message);
+    }
+  }, [
+    account,
+    action,
+    amount,
+    buildPlan,
+    connect,
+    pushActivity,
+    selectedPair,
+    switchToSepolia,
+    wrongNetwork
+  ]);
+
+  const onPrimary = useCallback(() => {
+    void runAction();
+  }, [runAction]);
 
   const openPlanDrawer = useCallback(() => {
     setPlanOpen(true);
@@ -435,7 +642,9 @@ export function VeylbaseAppShell({
   const eyebrow = eyebrowByAction[action];
   const title = titleFor(action, selectedPair);
   const subtitle = subtitleFor(action, selectedPair);
-  const primaryLabel = primaryLabelFor(action, Boolean(account));
+  const primaryLabel = executing
+    ? "Working..."
+    : primaryLabelFor(action, Boolean(account));
   const revealCta = account ? "Sign & reveal" : "Connect & reveal";
   const amountLabel =
     action === "unwrap" ? "Amount to unshield" : action === "claimFaucet" ? "Amount to mint" : "Amount to shield";
@@ -446,7 +655,11 @@ export function VeylbaseAppShell({
       ? "Wrong network"
       : publicBalance
         ? formatAmount(Number(publicBalance.formatted), selectedPair.decimals)
-        : "…";
+        : "...";
+
+  const privateBalanceDisplay = privateBalance
+    ? privateBalance.formatted
+    : "******";
 
   return (
     <main className="vb-app">
@@ -517,7 +730,7 @@ export function VeylbaseAppShell({
             <span className="vb-asset-bal">
               <small>Public · Private</small>
               <span>
-                {publicBalanceDisplay} <span className="vb-accent">· ••••••</span>
+                {publicBalanceDisplay} <span className="vb-accent">· {privateBalanceDisplay}</span>
               </span>
             </span>
             <span className="vb-change">
@@ -532,7 +745,10 @@ export function VeylbaseAppShell({
                 account={account}
                 confidentialSymbol={selectedPair.confidentialSymbol}
                 cta={revealCta}
-                onReveal={() => (account ? void generatePlan("decryptBalance") : void connect())}
+                loading={executing}
+                revealedValue={privateBalanceDisplay}
+                revealed={Boolean(privateBalance)}
+                onReveal={onPrimary}
               />
             ) : (
               <div className="vb-flow">
@@ -600,10 +816,17 @@ export function VeylbaseAppShell({
                 </button>
               </div>
             )}
+            {execution || actionError ? (
+              <ExecutionStatus
+                chain={snapshot.chain}
+                error={actionError}
+                execution={execution}
+              />
+            ) : null}
           </div>
         </div>
 
-        <ActivityPanel activity={activity} />
+        <ActivityPanel activity={activity} chain={snapshot.chain} />
       </div>
 
       {assetSheetOpen ? (
@@ -715,40 +938,91 @@ function Topbar({
   );
 }
 
+function explorerTxUrl(chain: UiRegistryChain, txHash: Hex) {
+  return `${chain.explorerUrl}/tx/${txHash}`;
+}
+
+function ExecutionStatus({
+  chain,
+  error,
+  execution
+}: {
+  chain: UiRegistryChain;
+  error: string | null;
+  execution: ExecutionState | null;
+}) {
+  if (!execution && !error) return null;
+  const status = execution?.status ?? "error";
+  const txHash = execution?.txHash;
+  return (
+    <div className={cx("vb-execution", `is-${status}`)} role="status">
+      <span className="vb-execution-dot" />
+      <span className="vb-execution-copy">
+        <strong>{execution?.title ?? "Action did not complete"}</strong>
+        <small>{error ?? execution?.detail}</small>
+      </span>
+      {txHash ? (
+        <a
+          className="vb-execution-link"
+          href={explorerTxUrl(chain, txHash)}
+          rel="noreferrer"
+          target="_blank"
+        >
+          View
+        </a>
+      ) : null}
+    </div>
+  );
+}
+
 function RevealPanel({
   account,
   confidentialSymbol,
   cta,
+  loading,
+  revealed,
+  revealedValue,
   onReveal
 }: {
   account: string | null;
   confidentialSymbol: string;
   cta: string;
+  loading: boolean;
+  revealed: boolean;
+  revealedValue: string;
   onReveal: () => void;
 }) {
   return (
     <div className="vb-flow">
       <div className="vb-reveal-card">
-        <span className="vb-reveal-label">Private holding · {confidentialSymbol}</span>
-        <strong className="vb-reveal-hidden">••••••</strong>
+        <span className="vb-reveal-label">Private holding - {confidentialSymbol}</span>
+        <strong className={cx("vb-reveal-hidden", revealed && "is-revealed")}>
+          {revealed ? revealedValue : "******"}
+        </strong>
         <span className="vb-reveal-hint">
           <Lock size={13} aria-hidden="true" />
-          Hidden by default — encrypted on-chain
+          {revealed ? "Revealed in this session" : "Hidden by default - encrypted on-chain"}
         </span>
       </div>
       <p className="vb-reveal-copy">
-        Revealing decrypts the balance to your wallet only. You sign a permit — no
+        Revealing decrypts the balance to your wallet only. You sign a permit - no
         transaction, no on-chain trace.
       </p>
-      <button className="vb-primary" onClick={onReveal} type="button">
+      <button className="vb-primary" disabled={loading} onClick={onReveal} type="button">
         <Eye size={17} aria-hidden="true" />
-        {account ? cta : "Connect & reveal"}
+        {loading ? "Revealing..." : account ? cta : "Connect & reveal"}
       </button>
     </div>
   );
 }
 
-function ActivityPanel({ activity }: { activity: ActivityEvent[] }) {
+function ActivityPanel({
+  activity,
+  chain
+}: {
+  activity: ActivityEvent[];
+  chain: UiRegistryChain;
+}) {
   return (
     <div className="vb-activity">
       <span className="vb-activity-title">Activity</span>
@@ -759,7 +1033,20 @@ function ActivityPanel({ activity }: { activity: ActivityEvent[] }) {
           {activity.map((event) => (
             <div className="vb-activity-row" key={event.id}>
               <span className={cx("vb-dot", `vb-dot-${event.tone}`)} />
-              <span className="vb-activity-text">{event.title}</span>
+              <span className="vb-activity-text">
+                <strong>{event.title}</strong>
+                {event.detail ? <small>{event.detail}</small> : null}
+              </span>
+              {event.txHash ? (
+                <a
+                  className="vb-activity-link"
+                  href={explorerTxUrl(chain, event.txHash)}
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  View
+                </a>
+              ) : null}
             </div>
           ))}
         </div>

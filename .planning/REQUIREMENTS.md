@@ -24,7 +24,7 @@
   Acceptance: `/api/registry/validate` returns pass/fail checks for official pair coverage, faucet coverage, wrap/unwrap capabilities, decrypt coverage, and duplicate addresses.
 
 - Requirement: Build a polished production UI.
-  Acceptance: first screen is the working dApp, not a marketing landing page. It includes wallet/network state, registry explorer, selected-pair action surface, faucet flow, wrap/unwrap flow, decrypt flow, and transaction/activity states.
+  Acceptance: `/` is a focused public landing page with an `Enter dApp` path, and `/app` is the working dApp. The dApp includes wallet/network state, asset selection, selected-pair action surface, faucet flow, shield/unshield flow, reveal flow, and transaction/activity states without dashboard/card-soup or backend-process leakage.
 
 - Requirement: Preserve Veylbase brand clarity.
   Acceptance: UI, docs, and planning refer to the product as Veylbase with the descriptor "The confidential wrapper registry for Zama."; no unapproved shorthand appears.
@@ -63,7 +63,7 @@
   Status: Open. Vercel is likely, but not yet chosen.
 
 - Question: Which wallet connector stack should be used for the UI?
-  Status: Open. Candidate path is wagmi/viem plus Zama React SDK, but this should be verified before implementation.
+  Status: Decided for current phases. Phase 003/004 use a lightweight viem + injected EIP-1193 wallet path with the Zama core SDK; wagmi/WalletConnect can be layered later if multi-wallet/mobile connector support becomes required.
 
 - Question: What exact public pronunciation should be used in demo narration?
   Status: Open. Brand meaning is confirmed as "Veil + base"; do not introduce a shorthand until confirmed.
