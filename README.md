@@ -7,7 +7,7 @@ Built for the Zama Developer Program, the app is intentionally UX-first: the pub
 ## Links
 
 - Source: https://github.com/ADxZimmy/Veylbase
-- Live dApp: pending Vercel deployment in Phase 006
+- Live dApp: https://veylbase.vercel.app
 
 ## What You Can Do
 

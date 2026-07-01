@@ -4,7 +4,7 @@ The make-or-break acceptance test. A non-author can follow this top to bottom. U
 
 ## Result
 
-In progress. Local gate passed and the public GitHub repo exists. Vercel deploy and funded-wallet UAT are not run yet.
+In progress. Local gate passed, the public GitHub repo exists, and the Vercel production deployment is live at `https://veylbase.vercel.app`. Funded-wallet UAT is not run yet.
 
 ## Submission form fields (capture at Day-1 portal registration — B2)
 
@@ -31,7 +31,7 @@ Fill this in when registering on the Developer Hub / Guild, BEFORE deploy/UAT, s
 1.1 **Wallet:** MetaMask / any injected EIP-1193 (`window.ethereum`) in desktop Chromium or Firefox. No WalletConnect.
 1.2 **Network:** add/select **Sepolia** (chainId `11155111` / hex `0xaa36a7`).
 1.3 **Gas:** fund ~**0.1 Sepolia ETH** (Google Cloud Web3 / Alchemy / Infura Sepolia faucet) — ~5+ signed txs ahead. Confirm in MetaMask.
-1.4 **App URL:** the deployed Vercel URL (preferred) or a local **production** build (`npm run build && npm run start`, NOT `next dev`) → `http://localhost:3000/app`. Record it.
+1.4 **App URL:** use `https://veylbase.vercel.app/app` for the deployed run, or a local **production** build (`npm run build && npm run start`, NOT `next dev`) → `http://localhost:3000/app`. Record it.
 1.5 **RPC insurance:** if you see RPC errors / slow balance reads / `waitForTransactionReceipt` stalls, set `NEXT_PUBLIC_SEPOLIA_RPC_URL` to a dedicated endpoint and rebuild/redeploy. Record whether it was set.
 1.6 **SDK / cross-origin check:** open DevTools → Console. Before the encrypted path, confirm NO `SharedArrayBuffer is not defined` / cross-origin-isolation errors when clicking Reveal/Shield. The default single-thread path should NOT need COOP/COEP. If such an error appears, that is a real blocker — but the fix is NOT to add `require-corp` (it breaks the `cdn.zama.org` fetch); investigate whether the SDK was put in threaded mode. Record any header change needed.
 1.7 **Test pairs** from the live registry (`0x2f0750…128e`): one **6-decimal** faucet pair (**USDC / cUSDC**) and one **non-6 underlying** pair (**WETH = 18 underlying / 6 confidential**) for the decimals gate. Substitute the closest equivalents if symbols differ; note it.

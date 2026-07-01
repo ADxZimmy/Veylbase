@@ -1,6 +1,6 @@
 # Verification
 
-Status: IN PROGRESS. Local ship gate and public repo setup are done; Vercel deployment is blocked by expired Vercel auth; funded-wallet UAT is not run.
+Status: IN PROGRESS. Local ship gate, public repo setup, Vercel GitHub connection, production deploy, and non-wallet deployed smoke are done. Funded-wallet UAT, demo recording, screenshots, and portal submission are not run.
 
 ## Automated Checks
 
@@ -14,23 +14,39 @@ Status: IN PROGRESS. Local ship gate and public repo setup are done; Vercel depl
 
 - Command: `npm.cmd run test`
   Result: Passed.
-  Notes: 4 files, 12 tests.
+  Notes: 4 files, 12 tests. Run on 2026-07-01 after fresh clone/lock refresh.
 
 - Command: `npm.cmd run build`
   Result: Passed.
-  Notes: Next 16.2.9 production build completed.
+  Notes: Next 16.2.9 production build completed on 2026-07-01 after fresh clone/lock refresh.
+
+- Command: `npm install`
+  Result: Passed.
+  Notes: Refreshed `package-lock.json` after `npm ci` reported missing optional `@emnapi/core` and `@emnapi/runtime` entries. NPM still reports 5 known advisories.
+
+- Command: `npm ci`
+  Result: Passed.
+  Notes: Clean install succeeds after the lockfile refresh.
+
+- Command: `npm.cmd audit --omit=dev --json`
+  Result: Completed with known advisories.
+  Notes: 5 production advisories remain (2 moderate, 3 high); no scoped non-breaking fix applied.
 
 - Command: Public repo setup
   Result: Passed.
   Notes: Created `https://github.com/NnazimuzoO/Veylbase` and configured `origin`. 2026-07-01: repo ownership transferred to `ADxZimmy` (now `https://github.com/ADxZimmy/Veylbase`) for Vercel deploy; NnazimuzoO retains `write` as a collaborator; local `origin` repointed to the new URL.
 
-- Command: Vercel deploy via connector
-  Result: Blocked.
-  Notes: Vercel MCP deploy returned HTTP 401 `token_expired`; `.vercel/project.json` is absent, so the project is not linked locally.
+- Command: Vercel link + GitHub connection
+  Result: Passed.
+  Notes: `vercel link --yes --team team_SumcS7BfGXgJWdQc7y2iAxSk --project veylbase` created project `sanuske2-2147s-projects/veylbase`, wrote local `.vercel/project.json`, added `.vercel` to `.gitignore`, and connected `https://github.com/ADxZimmy/Veylbase`.
+
+- Command: Vercel production deploy
+  Result: Passed.
+  Notes: `vercel deploy --prod --yes` deployed `dpl_8S5j91FcTnf5ijN4D65Zi9EP3uQp`; production URL `https://veylbase-dxolczw8h-sanuske2-2147s-projects.vercel.app`; alias `https://veylbase.vercel.app`; Vercel status Ready.
 
 - Command: Post-deploy smoke of live `/app`
-  Result: Pending.
-  Notes: Requires a live Vercel URL.
+  Result: Partially passed.
+  Notes: Non-wallet checks passed: `/` 200, `/app` 200, `Veylbase` content present, `Referrer-Policy` and `X-Content-Type-Options` present, COOP/COEP absent, `https://cdn.zama.org/relayer-sdk-js/0.4.4/relayer-sdk-js.umd.cjs` returned 200, and Vercel production error logs were clean for the first post-deploy window. Wallet connect and deployed-origin Reveal still require browser wallet approval during UAT.
 
 ## Manual Checks
 
@@ -48,13 +64,13 @@ Status: IN PROGRESS. Local ship gate and public repo setup are done; Vercel depl
 
 - Check: Submission artifacts present and filed.
   Result: Partially complete.
-  Notes: Public repo and license exist. Live URL, demo video, final README live-demo URL, screenshots, and portal filing are pending.
+  Notes: Public repo, license, live URL, and README live URL exist. Demo video, final connected-state screenshots, and portal filing are pending.
 
 ## Residual Risk
 
-- Risk: Vercel auth/link/env is not ready.
-  Owner: User/Codex after Vercel sign-in refresh.
-  Mitigation: Run `vercel.cmd login`, `vercel.cmd link`, set `NEXT_PUBLIC_SEPOLIA_RPC_URL` in Production and Preview, then deploy.
+- Risk: Dedicated Vercel RPC env is not configured.
+  Owner: User/Codex before funded-wallet UAT if the public fallback is slow.
+  Mitigation: Add a referrer/domain-restricted `NEXT_PUBLIC_SEPOLIA_RPC_URL` in Production and Preview, then redeploy. Current Vercel env list has no variables, so the live app uses `https://ethereum-sepolia-rpc.publicnode.com`.
 
 - Risk: The encrypted path could fail only on the deployed origin.
   Owner: User/Codex during post-deploy smoke and UAT.

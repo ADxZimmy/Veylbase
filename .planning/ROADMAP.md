@@ -26,7 +26,7 @@
 
 - Phase: 006 - Ship gate: deploy, UAT, submission
   Outcome: Deploy to a public Sepolia URL on Vercel, run the funded-wallet UAT including the WETH 18/6 decimals gate and reload-mid-unshield recovery, record the real-voice demo, and submit to the Zama Developer Program before 2026-07-07 23:59 AOE.
-  Status: Planned. Plan + funded-wallet runbook authored at `.planning/phases/006-ship-gate-deploy-uat-submission/`.
+  Status: In progress. Live Vercel deployment is available at `https://veylbase.vercel.app`; funded-wallet UAT, demo recording, and portal submission remain.
 
 ## Later
 

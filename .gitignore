@@ -36,3 +36,6 @@ Thumbs.db
 
 # Design import artifacts (unpacked reference kept under design-system-review-request/)
 *-handoff.zip
+
+# Vercel
+.vercel
