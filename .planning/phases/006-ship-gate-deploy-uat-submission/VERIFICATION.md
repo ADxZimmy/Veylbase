@@ -42,11 +42,11 @@ Status: IN PROGRESS. Local ship gate, public repo setup, Vercel GitHub connectio
 
 - Command: Vercel production deploy
   Result: Passed.
-  Notes: `vercel deploy --prod --yes` deployed `dpl_8S5j91FcTnf5ijN4D65Zi9EP3uQp`; production URL `https://veylbase-dxolczw8h-sanuske2-2147s-projects.vercel.app`; alias `https://veylbase.vercel.app`; Vercel status Ready.
+  Notes: `vercel deploy --prod --yes` first deployed `dpl_8S5j91FcTnf5ijN4D65Zi9EP3uQp`; pushing commit `243853a` then triggered the GitHub-backed production deployment `dpl_GXbnNLmBLc3cwTmfDzPMVkQ2y78Q`. Final production URL is `https://veylbase-1abf5wfc6-sanuske2-2147s-projects.vercel.app`; alias `https://veylbase.vercel.app`; Vercel status Ready.
 
 - Command: Post-deploy smoke of live `/app`
   Result: Partially passed.
-  Notes: Non-wallet checks passed: `/` 200, `/app` 200, `Veylbase` content present, `Referrer-Policy` and `X-Content-Type-Options` present, COOP/COEP absent, `https://cdn.zama.org/relayer-sdk-js/0.4.4/relayer-sdk-js.umd.cjs` returned 200, and Vercel production error logs were clean for the first post-deploy window. Wallet connect and deployed-origin Reveal still require browser wallet approval during UAT.
+  Notes: Non-wallet checks passed on the final alias: `/` 200, `/app` 200, `Veylbase` content present, `Referrer-Policy` and `X-Content-Type-Options` present, COOP/COEP absent, `https://cdn.zama.org/relayer-sdk-js/0.4.4/relayer-sdk-js.umd.cjs` returned 200, and Vercel production error logs were clean for the first post-deploy window. Wallet connect and deployed-origin Reveal still require browser wallet approval during UAT.
 
 ## Manual Checks
 
