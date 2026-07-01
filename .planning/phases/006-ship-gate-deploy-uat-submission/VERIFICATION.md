@@ -42,7 +42,7 @@ Status: IN PROGRESS. Local ship gate, public repo setup, Vercel GitHub connectio
 
 - Command: Vercel production deploy
   Result: Passed.
-  Notes: `vercel deploy --prod --yes` first deployed `dpl_8S5j91FcTnf5ijN4D65Zi9EP3uQp`; pushing commit `243853a` then triggered the GitHub-backed production deployment `dpl_GXbnNLmBLc3cwTmfDzPMVkQ2y78Q`. Final production URL is `https://veylbase-1abf5wfc6-sanuske2-2147s-projects.vercel.app`; alias `https://veylbase.vercel.app`; Vercel status Ready.
+  Notes: `vercel deploy --prod --yes` first deployed `dpl_8S5j91FcTnf5ijN4D65Zi9EP3uQp`; subsequent pushes to `main` trigger GitHub-backed production deployments. Stable production alias is `https://veylbase.vercel.app`; Vercel status Ready.
 
 - Command: Post-deploy smoke of live `/app`
   Result: Partially passed.
