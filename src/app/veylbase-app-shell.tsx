@@ -105,6 +105,8 @@ const eyebrowByAction: Record<ActionPlanKey, string> = {
 };
 
 const FAUCET_PER_CALL_LIMIT = 1_000_000;
+const REVEALED_BALANCE_TTL_MS = 8_000;
+const ACTION_SOFT_TIMEOUT_MS = 90_000;
 
 function cx(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
@@ -168,6 +170,10 @@ export function VeylbaseAppShell({
   const [balanceRefreshKey, setBalanceRefreshKey] = useState(0);
   const [execution, setExecution] = useState<ExecutionState | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [pendingUnshield, setPendingUnshield] = useState<{
+    pairId: string;
+    txHash: Hex;
+  } | null>(null);
 
   const pairs = snapshot.pairs;
   const selectedPair =
@@ -229,6 +235,7 @@ export function VeylbaseAppShell({
     setChainId(null);
     setBalances({});
     setPrivateBalances({});
+    setPendingUnshield(null);
     setPlan(null);
     setExecution(null);
     setActionError(null);
@@ -256,6 +263,7 @@ export function VeylbaseAppShell({
     const onAccounts = (...args: unknown[]) => {
       const next = (args[0] as string[] | undefined)?.[0] ?? null;
       setAccount(next);
+      setPendingUnshield(null);
       if (!next) {
         setChainId(null);
         setBalances({});
@@ -269,6 +277,7 @@ export function VeylbaseAppShell({
       setChainId((args[0] as string) ?? null);
       setBalances({});
       setPrivateBalances({});
+      setPendingUnshield(null);
       setPlan(null);
       setExecution(null);
       setActionError(null);
@@ -303,6 +312,71 @@ export function VeylbaseAppShell({
       cancelled = true;
     };
   }, [account, balanceRefreshKey, onSepolia, selectedPair]);
+
+  useEffect(() => {
+    if (!account || !onSepolia || !selectedPair) {
+      return;
+    }
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const actions = await import("./confidential-actions");
+        const txHash = await actions.loadPendingUnshieldHash({
+          wrapperAddress: getAddress(selectedPair.confidentialAddress)
+        });
+        if (!cancelled) {
+          setPendingUnshield(
+            txHash ? { pairId: selectedPair.id, txHash } : null
+          );
+        }
+      } catch {
+        if (!cancelled) setPendingUnshield(null);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [account, onSepolia, selectedPair]);
+
+  useEffect(() => {
+    if (!privateBalance || !account || !chainId || !selectedPair) return;
+    const pairId = selectedPair.id;
+    const timer = window.setTimeout(() => {
+      setPrivateBalances((current) => {
+        if (!current[pairId]) return current;
+        const next = { ...current };
+        delete next[pairId];
+        return next;
+      });
+    }, REVEALED_BALANCE_TTL_MS);
+
+    return () => window.clearTimeout(timer);
+  }, [account, chainId, privateBalance, selectedPair]);
+
+  useEffect(() => {
+    if (!executing) return;
+    const timer = window.setTimeout(() => {
+      setActionError(
+        "This is taking longer than expected. Check your wallet activity before retrying."
+      );
+      setExecution((current) =>
+        current?.status === "running"
+          ? {
+              ...current,
+              status: "error",
+              phase: "complete",
+              title: "Action is still pending",
+              detail:
+                "This is taking longer than expected. Check your wallet activity before retrying."
+            }
+          : current
+      );
+    }, ACTION_SOFT_TIMEOUT_MS);
+
+    return () => window.clearTimeout(timer);
+  }, [executing]);
 
   const selectAction = useCallback((next: ActionPlanKey) => {
     setAction(next);
@@ -485,6 +559,21 @@ export function VeylbaseAppShell({
     [account, buildPlan, pushActivity, selectedPair]
   );
 
+  const failAction = useCallback(
+    (error: unknown) => {
+      const message = executionErrorMessage(error);
+      setActionError(message);
+      setExecution({
+        status: "error",
+        phase: "complete",
+        title: "Action did not complete",
+        detail: message
+      });
+      pushActivity("Action did not complete", "neutral", message);
+    },
+    [pushActivity]
+  );
+
   const runAction = useCallback(async () => {
     if (!account) {
       void connect();
@@ -598,6 +687,7 @@ export function VeylbaseAppShell({
         return next;
       });
       setBalanceRefreshKey((current) => current + 1);
+      if (action === "unwrap") setPendingUnshield(null);
       setExecution({
         status: "success",
         phase: "complete",
@@ -607,15 +697,7 @@ export function VeylbaseAppShell({
       });
       pushActivity(result.title, "success", "Confirmed on Sepolia.", result.txHash);
     } catch (error) {
-      const message = executionErrorMessage(error);
-      setActionError(message);
-      setExecution({
-        status: "error",
-        phase: "complete",
-        title: "Action did not complete",
-        detail: message
-      });
-      pushActivity("Action did not complete", "neutral", message);
+      failAction(error);
     }
   }, [
     account,
@@ -623,6 +705,87 @@ export function VeylbaseAppShell({
     amount,
     buildPlan,
     connect,
+    failAction,
+    pushActivity,
+    selectedPair,
+    switchToSepolia,
+    wrongNetwork
+  ]);
+
+  const resumePendingUnshield = useCallback(async () => {
+    if (!account) {
+      void connect();
+      return;
+    }
+    if (wrongNetwork) {
+      void switchToSepolia();
+      return;
+    }
+    if (!pendingUnshield || pendingUnshield.pairId !== selectedPair?.id) return;
+
+    const provider = getEthereum();
+    if (!provider) {
+      setWalletError(
+        "No EVM wallet detected. Install MetaMask or another browser wallet to continue."
+      );
+      return;
+    }
+    if (!selectedPair) return;
+
+    setAction("unwrap");
+    setActionError(null);
+    setExecution({
+      status: "running",
+      phase: "planning",
+      title: "Resuming pending unshield",
+      detail: "Veylbase is recovering the unwrap you already submitted."
+    });
+
+    try {
+      const actions = await import("./confidential-actions");
+      const walletAccount = getAddress(account);
+      const onProgress = (progress: ExecutionProgress) => {
+        setExecution({ ...progress, status: "running" });
+        if (progress.txHash) {
+          pushActivity(progress.title, "accent", progress.detail, progress.txHash);
+        }
+      };
+      const result = await actions.executeResumeUnshield({
+        account: walletAccount,
+        callbacks: { onProgress },
+        provider,
+        unwrapTxHash: pendingUnshield.txHash,
+        wrapperAddress: getAddress(selectedPair.confidentialAddress)
+      });
+
+      setBalances((current) => {
+        const next = { ...current };
+        delete next[selectedPair.id];
+        return next;
+      });
+      setPrivateBalances((current) => {
+        const next = { ...current };
+        delete next[selectedPair.id];
+        return next;
+      });
+      setPendingUnshield(null);
+      setBalanceRefreshKey((current) => current + 1);
+      setExecution({
+        status: "success",
+        phase: "complete",
+        title: result.title,
+        detail: "Confirmed on Sepolia.",
+        txHash: result.txHash
+      });
+      pushActivity(result.title, "success", "Confirmed on Sepolia.", result.txHash);
+    } catch (error) {
+      failAction(error);
+    }
+  }, [
+    account,
+    connect,
+    failAction,
+    pendingUnshield,
     pushActivity,
     selectedPair,
     switchToSepolia,
@@ -741,6 +904,15 @@ export function VeylbaseAppShell({
           </button>
 
           <div className="vb-card-body">
+            {pendingUnshield?.pairId === selectedPair.id ? (
+              <PendingUnshieldNotice
+                chain={snapshot.chain}
+                disabled={executing}
+                onResume={resumePendingUnshield}
+                txHash={pendingUnshield.txHash}
+              />
+            ) : null}
+
             {isReveal ? (
               <RevealPanel
                 account={account}
@@ -822,6 +994,7 @@ export function VeylbaseAppShell({
                 chain={snapshot.chain}
                 error={actionError}
                 execution={execution}
+                onRetry={onPrimary}
               />
             ) : null}
           </div>
@@ -946,11 +1119,13 @@ function explorerTxUrl(chain: UiRegistryChain, txHash: Hex) {
 function ExecutionStatus({
   chain,
   error,
-  execution
+  execution,
+  onRetry
 }: {
   chain: UiRegistryChain;
   error: string | null;
   execution: ExecutionState | null;
+  onRetry: () => void;
 }) {
   if (!execution && !error) return null;
   const status = execution?.status ?? "error";
@@ -962,7 +1137,11 @@ function ExecutionStatus({
         <strong>{execution?.title ?? "Action did not complete"}</strong>
         <small>{error ?? execution?.detail}</small>
       </span>
-      {txHash ? (
+      {status === "error" ? (
+        <button className="vb-execution-link" onClick={onRetry} type="button">
+          Retry
+        </button>
+      ) : txHash ? (
         <a
           className="vb-execution-link"
           href={explorerTxUrl(chain, txHash)}
@@ -972,6 +1151,46 @@ function ExecutionStatus({
           View
         </a>
       ) : null}
+    </div>
+  );
+}
+
+function PendingUnshieldNotice({
+  chain,
+  disabled,
+  onResume,
+  txHash
+}: {
+  chain: UiRegistryChain;
+  disabled: boolean;
+  onResume: () => void;
+  txHash: Hex;
+}) {
+  return (
+    <div className="vb-pending-unshield" role="status">
+      <span className="vb-execution-dot" />
+      <span className="vb-execution-copy">
+        <strong>Pending unshield found</strong>
+        <small>Finish the unwrap you already submitted before starting another one.</small>
+      </span>
+      <span className="vb-pending-actions">
+        <a
+          className="vb-execution-link"
+          href={explorerTxUrl(chain, txHash)}
+          rel="noreferrer"
+          target="_blank"
+        >
+          View
+        </a>
+        <button
+          className="vb-execution-link"
+          disabled={disabled}
+          onClick={onResume}
+          type="button"
+        >
+          Resume
+        </button>
+      </span>
     </div>
   );
 }

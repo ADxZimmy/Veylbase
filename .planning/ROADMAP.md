@@ -18,18 +18,18 @@
   Outcome: Real faucet, shield, unshield/finalize, decrypt, errors, pending states, and activity timeline; plus review fixes (confidential-decimals correctness, lazy-loaded SDK, mobile-clipping root fix).
   Status: Complete
 
+- Phase: 005 - Production hardening, docs, and demo prep
+  Outcome: Runtime/deploy config, Node/license metadata, SDK 3.2.0 bump, unshield recovery, auto-rehide, typed error UX, dApp-first docs, add-a-pair guide, and demo script.
+  Status: Complete
+
 ## Now
 
-- Phase: 005 - Production hardening, docs, and demo prep
-  Outcome: All wallet-free, deploy-free readiness: `.env.example` + dedicated RPC, Node pin, `next.config.ts` security headers (NO COOP/COEP), LICENSE, SDK `^3.2.0` bump, resilience/UX fixes (resume-interrupted-unshield, auto-rehide, typed error UX), a dApp-first README, the add-a-pair guide, and the ~3-minute demo script.
-  Status: Planned — plan authored (`.planning/phases/005-production-hardening-docs-and-demo/`)
-
-## Next
-
 - Phase: 006 - Ship gate: deploy, UAT, submission
-  Outcome: Deploy to a public Sepolia URL on Vercel, run the funded-wallet UAT (the make-or-break gate, incl. the WETH 18/6 decimals case), record the real-voice demo, and submit to the Zama Developer Program before 2026-07-07 23:59 AOE.
-  Status: Planned — plan + funded-wallet runbook authored (`.planning/phases/006-ship-gate-deploy-uat-submission/`)
+  Outcome: Deploy to a public Sepolia URL on Vercel, run the funded-wallet UAT including the WETH 18/6 decimals gate and reload-mid-unshield recovery, record the real-voice demo, and submit to the Zama Developer Program before 2026-07-07 23:59 AOE.
+  Status: Planned. Plan + funded-wallet runbook authored at `.planning/phases/006-ship-gate-deploy-uat-submission/`.
 
 ## Later
 
-- None. Phase 006 is the ship gate; post-submission iteration (multi-wallet/WalletConnect, CI, accessibility audit, execution-path test coverage) would open a Phase 007 only if pursued.
+- Phase: 007 - Optional post-submission hardening
+  Outcome: CI, WalletConnect/multi-wallet support, stricter CSP after live host confirmation, screenshot automation, and deeper execution-path tests.
+  Status: Optional.

@@ -4,6 +4,7 @@ import { toUiPair } from "../registry-view";
 import { VeylbaseAppShell } from "../veylbase-app-shell";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 30;
 
 export default async function VeylbaseApp() {
   const registry = await getRegistrySnapshot({ live: true, pageSize: 20 });

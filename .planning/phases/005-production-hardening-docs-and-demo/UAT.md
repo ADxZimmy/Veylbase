@@ -2,18 +2,21 @@
 
 ## Scenario
 
-A reviewer opens the repo and the locally-built app and confirms Veylbase looks and reads like a finished, production-ready submission — before any wallet is connected.
+A reviewer opens the repo and a locally-built production app and confirms Veylbase reads like a finished submission before any wallet is connected.
 
-1. README opens with a clear pitch, a live-demo placeholder, screenshots, feature list, architecture, run/env instructions, an add-a-pair guide, a security model, and a license. `LICENSE` and `.env.example` exist.
-2. `npm run build && npm run start` → `/` and `/app` render cleanly; no console errors at idle; security headers present and NO COOP/COEP.
-3. The action card shows readable error copy on a forced failure and never hangs on "Working..."; a revealed balance (local-config/mock) re-hides after ~8s; a synthetic pending unshield surfaces a "Resume pending unshield" banner.
-4. `docs/DEMO.md` contains a ~3-minute, beat-by-beat demo script anyone could record from.
+1. README opens with the product journey, local setup, architecture, API, Sepolia/Zama runtime notes, add-a-pair guide, demo script link, Known limitations, and license.
+2. `.env.example`, `LICENSE`, `docs/ADD_PAIR.md`, and `docs/DEMO.md` exist.
+3. `npm run build && npm run start` renders `/` and `/app`.
+4. Response headers include `Referrer-Policy` and `X-Content-Type-Options`, and do not include COOP/COEP.
+5. The code path for pending unshield, auto-rehide, typed relayer/runtime errors, retry, and running timeout is present and passes typecheck/lint.
 
 ## Result
 
-Not run (phase is planned).
+Passed for wallet-free Phase 005 scope.
 
 ## Notes
 
-- This phase's UAT is wallet-free. The confidential flows themselves (faucet → shield → reveal → unshield) are accepted in Phase 006's funded-wallet UAT.
-- The auto-rehide and resume-unshield behaviors are verified here only structurally (effect fires, banner gates); their on-chain correctness is part of the Phase 006 gate (E06).
+- Production smoke was run on port 3029 after the final build: `/` 200, `/app` 200, security headers present, COOP/COEP absent.
+- Error copy was covered by unit tests; live relayer/CDN failure copy must still be exercised in Phase 006 UAT case E05.
+- Auto-rehide and pending-unshield recovery are structurally verified but require a funded wallet to prove end to end in Phase 006 cases T06/T08/E06.
+- Wallet-free screenshots were not captured in this pass; capture final assets during Phase 006 deployment/UAT.

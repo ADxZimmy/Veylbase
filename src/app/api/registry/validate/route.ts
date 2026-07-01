@@ -4,6 +4,7 @@ import { getRegistrySnapshot } from "@/server/registry/service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 30;
 
 function asBoolean(value: string | null, defaultValue: boolean) {
   if (value === null) return defaultValue;

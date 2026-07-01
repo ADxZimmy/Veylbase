@@ -4,17 +4,17 @@ The make-or-break acceptance test. A non-author can follow this top to bottom. U
 
 ## Result
 
-Not run yet.
+In progress. Local gate passed and the public GitHub repo exists. Vercel deploy and funded-wallet UAT are not run yet.
 
 ## Submission form fields (capture at Day-1 portal registration — B2)
 
 Fill this in when registering on the Developer Hub / Guild, BEFORE deploy/UAT, so no field is discovered late:
 
-- Portal / form URL:
-- Required fields (verbatim):
-- Accepted demo-video host(s):
-- Repo / license requirements stated:
-- Confirmation-email lead time observed:
+- Public entry point: `https://www.zama.org/developer-hub#developer-program-section`
+- Required fields visible on public Developer Hub page: `GITHUB USER`, `Project`, `CODE`, `DESCRIPTION`, `DEMO`.
+- Accepted demo-video host(s): not specified publicly; confirm after authenticated registration.
+- Repo / license requirements stated: public source is available at `https://github.com/NnazimuzoO/Veylbase`; MIT `LICENSE` is present.
+- Confirmation-email lead time observed: not observed; authenticated registration still required.
 - Hard filing checkpoint: by 2026-07-06 23:59 (escalate to developer@zama.org / @zama_fhe if the form is not in hand by 2026-07-04).
 
 ## How the UI is wired (read once)

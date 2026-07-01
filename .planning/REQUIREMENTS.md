@@ -53,7 +53,7 @@
   Acceptance: deploys to Vercel with the default Next.js preset; pins Node 24 via `engines`; exposes a configurable `NEXT_PUBLIC_SEPOLIA_RPC_URL` (with `.env.example`) defaulting to a public node; serves security headers WITHOUT COOP/COEP (the single-thread `web()` SDK path needs no cross-origin isolation and would break the `cdn.zama.org` fetch and wallet popups); the deployed `/app` SSR live-registry read, wallet connect, and the encrypted relayer/CDN path all work on a plain HTTPS origin.
 
 - Requirement: Current Zama SDK + open-source license.
-  Acceptance: `@zama-fhe/sdk` and `@zama-fhe/react-sdk` track the current published line (target `^3.2.0`); the repo carries an explicit OSI `LICENSE` (MIT or BSD-3-Clause).
+  Acceptance: `@zama-fhe/sdk` tracks the current published line (`^3.2.0` in Phase 005); unused `@zama-fhe/react-sdk` is removed; the repo carries an explicit OSI `LICENSE` (MIT).
 
 ## Out Of Scope
 
@@ -69,13 +69,13 @@
   Status: Decided. Vercel, default Next.js preset, Sepolia (Brief §4). Custom domain TBD.
 
 - Question: Authoritative live relayer host and gateway chain id?
-  Status: Open. `chains.ts` shows `relayer.testnet.zama.cloud` / gateway `55815` (display-only, unused by the SDK), but the installed `@zama-fhe/sdk` preset resolves `relayer.testnet.zama.org/v2` / gateway `10901`. Confirm the actual host via the Network tab during Phase 006 UAT and correct/annotate `chains.ts`; do not wire the stale constant.
+  Status: Partially resolved. Installed `@zama-fhe/sdk` 3.2.0 preset resolves `relayer.testnet.zama.org/v2` / gateway `10901`; `chains.ts` display-only drift is annotated. Confirm actual live traffic via the Network tab during Phase 006 UAT before changing displayed constants or adding strict CSP.
 
 - Question: Which dedicated Sepolia RPC provider and key-exposure model?
-  Status: Resolve in Phase 005 (PLAN step 1). Recommend a referrer/domain-restricted `NEXT_PUBLIC_` Alchemy/Infura key (no code change); the server-only-key + proxy variant is out of scope (Phase 007) unless the provider can't restrict by referrer.
+  Status: Decided for Phase 005. Use `NEXT_PUBLIC_SEPOLIA_RPC_URL` with a referrer/domain-restricted Alchemy/Infura/dRPC key; no server proxy in this phase. Rebuild/redeploy after changing it.
 
 - Question: License choice?
-  Status: Resolve in Phase 005 (PLAN step 5). MIT vs BSD-3-Clause-Clear (Zama-house). Pick one; add `LICENSE` + matching `package.json` SPDX.
+  Status: Decided. MIT license added with matching `package.json` SPDX metadata.
 
 - Question: Which wallet connector stack should be used for the UI?
   Status: Decided for current phases. Phase 003/004 use a lightweight viem + injected EIP-1193 wallet path with the Zama core SDK; wagmi/WalletConnect can be layered later if multi-wallet/mobile connector support becomes required.

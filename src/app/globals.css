@@ -492,6 +492,18 @@ button:disabled {
   background: rgba(255, 107, 107, 0.07);
 }
 
+.vb-pending-unshield {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 16px;
+  padding: 12px 13px;
+  border: 1px solid rgba(255, 210, 8, 0.3);
+  border-radius: 10px;
+  background: rgba(255, 210, 8, 0.055);
+}
+
 .vb-execution-dot {
   width: 9px;
   height: 9px;
@@ -526,10 +538,25 @@ button:disabled {
 
 .vb-execution-link,
 .vb-activity-link {
+  border: 0;
+  background: transparent;
   color: var(--accent);
   font-size: 0.78rem;
   font-weight: 900;
+  font-family: var(--font-body);
   text-decoration: none;
+}
+
+.vb-execution-link:disabled {
+  color: var(--muted-3);
+  cursor: not-allowed;
+}
+
+.vb-pending-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  white-space: nowrap;
 }
 
 .vb-flow {
@@ -1422,8 +1449,17 @@ button:disabled {
     grid-template-columns: auto minmax(0, 1fr);
   }
 
+  .vb-pending-unshield {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
   .vb-execution-link {
     grid-column: 2;
+  }
+
+  .vb-pending-actions {
+    grid-column: 2;
+    justify-self: start;
   }
 
   .vb-flow-band {

@@ -4,6 +4,7 @@ import { buildTransactionPlan } from "@/server/transactions/planner";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 30;
 
 export async function POST(request: Request) {
   let body: unknown;

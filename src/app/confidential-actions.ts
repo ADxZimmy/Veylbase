@@ -1,6 +1,15 @@
 "use client";
 
 import {
+  ChainMismatchError,
+  clearPendingUnshield,
+  DecryptionFailedError,
+  InsufficientConfidentialBalanceError,
+  loadPendingUnshield,
+  NoCiphertextError,
+  RelayerRequestFailedError,
+  savePendingUnshield,
+  SigningRejectedError,
   ZamaSDK,
   indexedDBStorage,
   type ShieldCallbacks,
@@ -61,6 +70,29 @@ export type ConfidentialExecutionResult =
   | WriteExecutionResult
   | RevealExecutionResult;
 
+export type VeylbaseExecutionErrorCode =
+  | "wallet-rejected"
+  | "wrong-network"
+  | "confidential-balance-low"
+  | "no-private-balance"
+  | "zama-relayer-unavailable"
+  | "zama-runtime-unavailable"
+  | "zama-decryption-failed";
+
+export class VeylbaseExecutionError extends Error {
+  readonly code: VeylbaseExecutionErrorCode;
+
+  constructor(
+    code: VeylbaseExecutionErrorCode,
+    message: string,
+    options?: ErrorOptions
+  ) {
+    super(message, options);
+    this.name = "VeylbaseExecutionError";
+    this.code = code;
+  }
+}
+
 export interface BrowserEthereumProvider {
   request(args: { method: string; params?: unknown }): Promise<unknown>;
   on?(event: string, listener: (...args: unknown[]) => void): void;
@@ -117,6 +149,76 @@ function createSdk(provider: BrowserEthereumProvider, account: Address) {
   });
 
   return new ZamaSDK(config);
+}
+
+function normalizeSdkError(error: unknown) {
+  if (error instanceof VeylbaseExecutionError) return error;
+  if (error instanceof SigningRejectedError) {
+    return new VeylbaseExecutionError(
+      "wallet-rejected",
+      "Wallet request was rejected.",
+      { cause: error }
+    );
+  }
+  if (error instanceof ChainMismatchError) {
+    return new VeylbaseExecutionError(
+      "wrong-network",
+      "Your wallet and the app are not both on Sepolia.",
+      { cause: error }
+    );
+  }
+  if (error instanceof InsufficientConfidentialBalanceError) {
+    return new VeylbaseExecutionError(
+      "confidential-balance-low",
+      "Your revealed private balance is not high enough for this unshield.",
+      { cause: error }
+    );
+  }
+  if (error instanceof NoCiphertextError) {
+    return new VeylbaseExecutionError(
+      "no-private-balance",
+      "No private balance exists for this asset yet.",
+      { cause: error }
+    );
+  }
+  if (error instanceof RelayerRequestFailedError) {
+    return new VeylbaseExecutionError(
+      "zama-relayer-unavailable",
+      "The Zama relayer may be temporarily unavailable - try again.",
+      { cause: error }
+    );
+  }
+  if (error instanceof DecryptionFailedError) {
+    return new VeylbaseExecutionError(
+      "zama-decryption-failed",
+      "Could not decrypt this private balance. Try again in a moment.",
+      { cause: error }
+    );
+  }
+
+  const message =
+    error instanceof Error ? error.message : typeof error === "string" ? error : "";
+  const normalized = message.toLowerCase();
+  if (
+    normalized.includes("cdn.zama.org") ||
+    normalized.includes("importscripts") ||
+    normalized.includes("wasm") ||
+    normalized.includes("worker")
+  ) {
+    return new VeylbaseExecutionError(
+      "zama-runtime-unavailable",
+      "Could not load the Zama encryption runtime (cdn.zama.org). Check your connection and retry.",
+      error instanceof Error ? { cause: error } : undefined
+    );
+  }
+  if (normalized.includes("relayer")) {
+    return new VeylbaseExecutionError(
+      "zama-relayer-unavailable",
+      "The Zama relayer may be temporarily unavailable - try again.",
+      error instanceof Error ? { cause: error } : undefined
+    );
+  }
+  return error;
 }
 
 export async function executeFaucetMint({
@@ -228,6 +330,8 @@ export async function executeShield({
       txHash: result.txHash,
       result
     };
+  } catch (error) {
+    throw normalizeSdkError(error);
   } finally {
     sdk.terminate();
   }
@@ -249,14 +353,23 @@ export async function executeUnshield({
   const sdk = createSdk(provider, account);
   try {
     const wrapper = sdk.createWrappedToken(wrapperAddress);
+    let persistPending: Promise<void> | null = null;
     const unshieldCallbacks: UnshieldCallbacks = {
-      onUnwrapSubmitted: (txHash) =>
+      onUnwrapSubmitted: (txHash) => {
+        persistPending = savePendingUnshield(
+          indexedDBStorage,
+          wrapperAddress,
+          txHash
+        ).catch((error: unknown) => {
+          console.warn("Could not persist pending unshield", error);
+        });
         callbacks?.onProgress?.({
           phase: "submitted",
           title: "Unshield request submitted",
           detail: "The encrypted unwrap request is waiting for confirmation.",
           txHash
-        }),
+        });
+      },
       onFinalizing: () =>
         callbacks?.onProgress?.({
           phase: "finalizing",
@@ -283,6 +396,8 @@ export async function executeUnshield({
     const result = await wrapper.unshield(amount, {
       ...unshieldCallbacks
     });
+    if (persistPending) await persistPending;
+    await clearPendingUnshield(indexedDBStorage, wrapperAddress);
 
     callbacks?.onProgress?.({
       phase: "complete",
@@ -297,9 +412,80 @@ export async function executeUnshield({
       txHash: result.txHash,
       result
     };
+  } catch (error) {
+    throw normalizeSdkError(error);
   } finally {
     sdk.terminate();
   }
+}
+
+export async function executeResumeUnshield({
+  account,
+  callbacks,
+  provider,
+  unwrapTxHash,
+  wrapperAddress
+}: {
+  account: Address;
+  callbacks?: ExecutionCallbacks;
+  provider: BrowserEthereumProvider;
+  unwrapTxHash: Hex;
+  wrapperAddress: Address;
+}): Promise<WriteExecutionResult> {
+  const sdk = createSdk(provider, account);
+  try {
+    const wrapper = sdk.createWrappedToken(wrapperAddress);
+    const unshieldCallbacks: UnshieldCallbacks = {
+      onFinalizing: () =>
+        callbacks?.onProgress?.({
+          phase: "finalizing",
+          title: "Finalizing unshield",
+          detail: "The previous unwrap was found. Preparing the finalize transaction."
+        }),
+      onFinalizeSubmitted: (txHash) =>
+        callbacks?.onProgress?.({
+          phase: "submitted",
+          title: "Finalize submitted",
+          detail: "Waiting for the public tokens to be released.",
+          txHash
+        })
+    };
+
+    callbacks?.onProgress?.({
+      phase: "planning",
+      title: "Resuming pending unshield",
+      detail: "Veylbase is recovering the unwrap you already submitted."
+    });
+
+    const result = await wrapper.resumeUnshield(unwrapTxHash, unshieldCallbacks);
+    await clearPendingUnshield(indexedDBStorage, wrapperAddress);
+
+    callbacks?.onProgress?.({
+      phase: "complete",
+      title: "Balance unshielded",
+      detail: "Public tokens were released after the finalize transaction.",
+      txHash: result.txHash
+    });
+
+    return {
+      kind: "transaction",
+      title: "Balance unshielded",
+      txHash: result.txHash,
+      result
+    };
+  } catch (error) {
+    throw normalizeSdkError(error);
+  } finally {
+    sdk.terminate();
+  }
+}
+
+export async function loadPendingUnshieldHash({
+  wrapperAddress
+}: {
+  wrapperAddress: Address;
+}) {
+  return loadPendingUnshield(indexedDBStorage, wrapperAddress);
 }
 
 export async function revealConfidentialBalance({
@@ -335,6 +521,8 @@ export async function revealConfidentialBalance({
       title: "Private balance revealed",
       value
     };
+  } catch (error) {
+    throw normalizeSdkError(error);
   } finally {
     sdk.terminate();
   }
