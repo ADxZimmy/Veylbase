@@ -13,7 +13,7 @@ Fill this in when registering on the Developer Hub / Guild, BEFORE deploy/UAT, s
 - Public entry point: `https://www.zama.org/developer-hub#developer-program-section`
 - Required fields visible on public Developer Hub page: `GITHUB USER`, `Project`, `CODE`, `DESCRIPTION`, `DEMO`.
 - Accepted demo-video host(s): not specified publicly; confirm after authenticated registration.
-- Repo / license requirements stated: public source is available at `https://github.com/NnazimuzoO/Veylbase`; MIT `LICENSE` is present.
+- Repo / license requirements stated: public source is available at `https://github.com/ADxZimmy/Veylbase` (transferred from NnazimuzoO; NnazimuzoO retains write access as a collaborator); MIT `LICENSE` is present.
 - Confirmation-email lead time observed: not observed; authenticated registration still required.
 - Hard filing checkpoint: by 2026-07-06 23:59 (escalate to developer@zama.org / @zama_fhe if the form is not in hand by 2026-07-04).
 

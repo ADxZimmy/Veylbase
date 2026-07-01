@@ -22,7 +22,7 @@ Status: IN PROGRESS. Local ship gate and public repo setup are done; Vercel depl
 
 - Command: Public repo setup
   Result: Passed.
-  Notes: Created `https://github.com/NnazimuzoO/Veylbase` and configured `origin`.
+  Notes: Created `https://github.com/NnazimuzoO/Veylbase` and configured `origin`. 2026-07-01: repo ownership transferred to `ADxZimmy` (now `https://github.com/ADxZimmy/Veylbase`) for Vercel deploy; NnazimuzoO retains `write` as a collaborator; local `origin` repointed to the new URL.
 
 - Command: Vercel deploy via connector
   Result: Blocked.
