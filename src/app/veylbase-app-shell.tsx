@@ -120,25 +120,66 @@ function timeStamp() {
   return new Date().toTimeString().slice(0, 8);
 }
 
-function floorTo(value: number, decimals: number) {
-  const factor = 10 ** decimals;
-  return Math.floor((value + 1e-12) * factor) / factor;
+// Amount formatting and input are base-unit bigint end to end, so the on-screen
+// preview can never disagree with what execution submits (see buildPlan /
+// runAction), and precision holds for arbitrarily large amounts.
+
+/** Group the integer part of a decimal string with thousands separators. */
+function groupThousands(intPart: string) {
+  const negative = intPart.startsWith("-");
+  const digits = negative ? intPart.slice(1) : intPart;
+  const grouped = digits.replace(/\B(?=(\d{3})+(?!\d))/gu, ",");
+  return negative ? `-${grouped}` : grouped;
 }
 
-function formatAmount(value: number, decimals: number | null) {
+/**
+ * Format a base-unit bigint for display: exact grouped integer with the
+ * fraction truncated (never rounded up) to `maxFraction` and padded to
+ * `minFraction`. No float ever touches the value.
+ */
+function formatUnitsDisplay(
+  units: bigint,
+  decimals: number,
+  {
+    minFraction = 0,
+    maxFraction = 8
+  }: { minFraction?: number; maxFraction?: number } = {}
+) {
+  const [intPart, fractionPart = ""] = formatUnits(units, decimals).split(".");
+  let fraction = fractionPart.slice(0, maxFraction);
+  while (fraction.length < minFraction) fraction += "0";
+  const integer = groupThousands(intPart);
+  return fraction ? `${integer}.${fraction}` : integer;
+}
+
+/** Plain amount the user sends/mints, up to 8 fraction digits. */
+function formatSend(units: bigint, decimals: number | null) {
+  return formatUnitsDisplay(units, decimals ?? 6, { maxFraction: 8 });
+}
+
+/** Received/held amount, min 2 / max min(decimals, 6) fraction digits. */
+function formatBalance(units: bigint, decimals: number | null) {
   const max = decimals == null ? 6 : Math.min(decimals, 6);
-  return value.toLocaleString("en-US", {
-    minimumFractionDigits: Math.min(2, max),
-    maximumFractionDigits: max
+  return formatUnitsDisplay(units, decimals ?? 6, {
+    minFraction: Math.min(2, max),
+    maxFraction: max
   });
 }
 
-function formatPlain(value: number) {
-  return value.toLocaleString("en-US", { maximumFractionDigits: 8 });
-}
-
-function trimZeros(value: string) {
-  return value.replace(/0+$/u, "").replace(/\.$/u, "");
+/**
+ * Accept a keystroke only if it keeps the field a valid decimal within the
+ * token's precision. Returns the value to store, or null to reject the edit —
+ * so malformed input like "1.2.3", "abc", "1e9" or "-5" can never reach state,
+ * and the preview and CTA can never desync from execution. "" is allowed.
+ */
+function sanitizeAmountInput(next: string, maxDecimals: number | null): string | null {
+  if (next === "") return "";
+  if (!/^\d*\.?\d*$/u.test(next)) return null;
+  if (maxDecimals != null) {
+    const dot = next.indexOf(".");
+    if (dot >= 0 && next.length - dot - 1 > maxDecimals) return null;
+  }
+  return next;
 }
 
 function getEthereum(): BrowserEthereumProvider | undefined {
@@ -416,78 +457,113 @@ export function VeylbaseAppShell({
 
   const isReveal = action === "decryptBalance";
 
-  const amountNumber = useMemo(() => {
-    const parsed = Number.parseFloat(amount);
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
-  }, [amount]);
+  // The typed amount is denominated in the token the user is spending: the
+  // confidential token for unshield, the underlying ERC-20 otherwise.
+  const inputDecimals =
+    action === "unwrap"
+      ? selectedPair?.confidentialDecimals ?? null
+      : selectedPair?.decimals ?? null;
+
+  // Single source of truth for the amount, parsed to base units exactly the way
+  // buildPlan / runAction parse it. Empty or not-yet-valid input reads as 0n.
+  const amountUnits = useMemo(() => {
+    if (!amount || inputDecimals == null) return 0n;
+    try {
+      const units = parseUnits(amount, inputDecimals);
+      return units > 0n ? units : 0n;
+    } catch {
+      return 0n;
+    }
+  }, [amount, inputDecimals]);
+  const amountIsPositive = amountUnits > 0n;
+
+  const handleAmountChange = useCallback(
+    (next: string) => {
+      const sanitized = sanitizeAmountInput(next, inputDecimals);
+      if (sanitized != null) setAmount(sanitized);
+    },
+    [inputDecimals]
+  );
 
   const preview = useMemo(() => {
     if (!selectedPair) return null;
     const underlyingDecimals = selectedPair.decimals;
     const confDecimals = selectedPair.confidentialDecimals;
-    // Shielding loses precision only when the underlying carries more decimals
-    // than the confidential token can represent.
-    const losesPrecision =
-      underlyingDecimals != null &&
-      confDecimals != null &&
-      underlyingDecimals > confDecimals;
-    const capped = losesPrecision
-      ? floorTo(amountNumber, confDecimals)
-      : amountNumber;
-    const refund = losesPrecision ? amountNumber - capped : 0;
 
-    if (action === "wrap") {
-      return {
-        sendLabel: "You shield",
-        send: `${formatPlain(amountNumber)} ${selectedPair.symbol}`,
-        receive: `${formatAmount(capped, confDecimals)} ${selectedPair.confidentialSymbol}`,
-        refund: refund > 0 ? `${trimZeros(refund.toFixed(12))} ${selectedPair.symbol}` : null,
-        note: losesPrecision
-          ? `Wrapped 1:1 · confidential balance is capped at ${confDecimals} decimals.`
-          : "Wrapped 1:1 into a confidential balance."
-      };
-    }
     if (action === "unwrap") {
+      const sent = formatSend(amountUnits, confDecimals);
       return {
         sendLabel: "You unshield",
-        send: `${formatPlain(amountNumber)} ${selectedPair.confidentialSymbol}`,
-        receive: `${formatPlain(amountNumber)} ${selectedPair.symbol}`,
+        send: `${sent} ${selectedPair.confidentialSymbol}`,
+        receive: `${sent} ${selectedPair.symbol}`,
         refund: null,
         note: "Two-step: request then finalize. Funds arrive after confirmation."
       };
     }
+
+    if (action === "claimFaucet") {
+      const minted = formatSend(amountUnits, underlyingDecimals);
+      return {
+        sendLabel: "You mint",
+        send: `${minted} ${selectedPair.symbol}`,
+        receive: `${minted} ${selectedPair.symbol}`,
+        refund: null,
+        note: "Public mock faucet · up to 1,000,000 per call. Sepolia testing only."
+      };
+    }
+
+    // wrap: shielding only loses precision when the underlying carries more
+    // decimals than the confidential token can hold. All base-unit bigint, so
+    // the refund shown is exactly the dust execution leaves behind.
+    let receiveUnits = amountUnits;
+    let receiveDecimals = underlyingDecimals ?? confDecimals ?? 6;
+    let refundUnits = 0n;
+    let note = "Wrapped 1:1 into a confidential balance.";
+    if (
+      underlyingDecimals != null &&
+      confDecimals != null &&
+      underlyingDecimals > confDecimals
+    ) {
+      const scale = 10n ** BigInt(underlyingDecimals - confDecimals);
+      receiveUnits = amountUnits / scale;
+      receiveDecimals = confDecimals;
+      refundUnits = amountUnits - receiveUnits * scale;
+      note = `Wrapped 1:1 · confidential balance is capped at ${confDecimals} decimals.`;
+    }
     return {
-      sendLabel: "You mint",
-      send: `${formatPlain(amountNumber)} ${selectedPair.symbol}`,
-      receive: `${formatPlain(amountNumber)} ${selectedPair.symbol}`,
-      refund: null,
-      note: "Public mock faucet · up to 1,000,000 per call. Sepolia testing only."
+      sendLabel: "You shield",
+      send: `${formatSend(amountUnits, underlyingDecimals)} ${selectedPair.symbol}`,
+      receive: `${formatBalance(receiveUnits, receiveDecimals)} ${selectedPair.confidentialSymbol}`,
+      refund:
+        refundUnits > 0n
+          ? `${formatSend(refundUnits, underlyingDecimals)} ${selectedPair.symbol}`
+          : null,
+      note
     };
-  }, [action, amountNumber, selectedPair]);
+  }, [action, amountUnits, selectedPair]);
 
   const amountErrorText = useMemo(() => {
-    if (action === "claimFaucet" && amountNumber > FAUCET_PER_CALL_LIMIT) {
-      return "Faucet mints up to 1,000,000 tokens per call.";
+    if (!selectedPair) return null;
+    if (action === "claimFaucet") {
+      const limitUnits = parseUnits(
+        String(FAUCET_PER_CALL_LIMIT),
+        selectedPair.decimals ?? 6
+      );
+      if (amountUnits > limitUnits) {
+        return "Faucet mints up to 1,000,000 tokens per call.";
+      }
     }
-    if (
-      action === "wrap" &&
-      publicBalance &&
-      amountNumber > Number(publicBalance.formatted)
-    ) {
-      return `Exceeds your public ${selectedPair?.symbol ?? ""} balance.`;
+    if (action === "wrap" && publicBalance && amountUnits > publicBalance.raw) {
+      return `Exceeds your public ${selectedPair.symbol} balance.`;
     }
-    if (
-      action === "unwrap" &&
-      privateBalance &&
-      amountNumber > Number(privateBalance.formatted)
-    ) {
-      return `Exceeds your revealed private ${selectedPair?.confidentialSymbol ?? ""} balance.`;
+    if (action === "unwrap" && privateBalance && amountUnits > privateBalance.raw) {
+      return `Exceeds your revealed private ${selectedPair.confidentialSymbol} balance.`;
     }
     return null;
-  }, [action, amountNumber, privateBalance, publicBalance, selectedPair]);
+  }, [action, amountUnits, privateBalance, publicBalance, selectedPair]);
 
   const primaryDisabled =
-    executing || (!isReveal && (amountNumber <= 0 || amountErrorText != null));
+    executing || (!isReveal && (!amountIsPositive || amountErrorText != null));
 
   const maxDisabled =
     (action === "wrap" && !publicBalance) ||
@@ -811,8 +887,8 @@ export function VeylbaseAppShell({
 
   const openPlanDrawer = useCallback(() => {
     setPlanOpen(true);
-    if (account && (isReveal || amountNumber > 0)) void generatePlan(action);
-  }, [account, action, amountNumber, generatePlan, isReveal]);
+    if (account && (isReveal || amountIsPositive)) void generatePlan(action);
+  }, [account, action, amountIsPositive, generatePlan, isReveal]);
 
   if (!selectedPair) return null;
 
@@ -840,7 +916,7 @@ export function VeylbaseAppShell({
     : wrongNetwork
       ? "Wrong network"
       : publicBalance
-        ? formatAmount(Number(publicBalance.formatted), selectedPair.decimals)
+        ? formatBalance(publicBalance.raw, publicBalance.decimals)
         : "...";
   const privateValueDisplay = privateBalance
     ? `${privateBalance.formatted} ${selectedPair.confidentialSymbol}`
@@ -994,7 +1070,7 @@ export function VeylbaseAppShell({
                       autoComplete="off"
                       id="vb-amount"
                       inputMode="decimal"
-                      onChange={(event) => setAmount(event.target.value)}
+                      onChange={(event) => handleAmountChange(event.target.value)}
                       placeholder="0.00"
                       value={amount}
                     />
