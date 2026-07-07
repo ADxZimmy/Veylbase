@@ -417,7 +417,9 @@ button:disabled {
 }
 .vb-mode-idx {
   font: 600 11px var(--font-mono);
-  color: var(--muted-3);
+  /* muted-2 (not muted-3) keeps the index numerals at 4.9:1 on the mode bar,
+     clearing WCAG AA for this 11px label. */
+  color: var(--muted-2);
 }
 .vb-mode-label {
   font: 600 16px var(--font-display);
@@ -716,7 +718,14 @@ button:disabled {
   transition: border-color 150ms ease;
 }
 .vb-well:focus-within {
-  border-color: rgba(255, 210, 8, 0.6);
+  border-color: var(--accent);
+}
+/* Keyboard focus gets the same solid ring as every other control (the input
+   itself sets outline:none), so the amount field is no longer the one element
+   without a visible focus indicator. */
+.vb-well:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 .vb-well input {
   flex: 1;
@@ -1055,7 +1064,11 @@ button:disabled {
   transition: border-color 150ms ease;
 }
 .vb-search:focus-within {
-  border-color: rgba(255, 210, 8, 0.55);
+  border-color: var(--accent);
+}
+.vb-search:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 .vb-search input {
   flex: 1;

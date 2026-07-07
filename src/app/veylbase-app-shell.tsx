@@ -1,7 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  type KeyboardEvent as ReactKeyboardEvent,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState
+} from "react";
 import { ChevronDown, Code2, Eye, Lock, Search, Wallet, X } from "lucide-react";
 import { formatUnits, getAddress, parseUnits, type Hex } from "viem";
 import { BrandMark } from "./brand-mark";
@@ -442,6 +448,36 @@ export function VeylbaseAppShell({
     setActionError(null);
   }, []);
 
+  // Roving-tabindex tablist (WAI-ARIA): arrows move between the enabled modes,
+  // Home/End jump to the ends, and the disabled faucet cell is skipped.
+  const onModesKeyDown = useCallback(
+    (event: ReactKeyboardEvent<HTMLDivElement>) => {
+      const navKeys = ["ArrowRight", "ArrowLeft", "ArrowDown", "ArrowUp", "Home", "End"];
+      if (!navKeys.includes(event.key)) return;
+      const enabled = modeTabs.filter(
+        (mode) => !(mode.key === "claimFaucet" && !selectedPair?.faucet)
+      );
+      if (enabled.length === 0) return;
+      event.preventDefault();
+      const current = Math.max(
+        0,
+        enabled.findIndex((mode) => mode.key === action)
+      );
+      let nextIndex = current;
+      if (event.key === "Home") nextIndex = 0;
+      else if (event.key === "End") nextIndex = enabled.length - 1;
+      else if (event.key === "ArrowRight" || event.key === "ArrowDown")
+        nextIndex = (current + 1) % enabled.length;
+      else nextIndex = (current - 1 + enabled.length) % enabled.length;
+      const nextKey = enabled[nextIndex].key;
+      if (nextKey !== action) selectAction(nextKey);
+      event.currentTarget
+        .querySelector<HTMLButtonElement>(`[data-mode-key="${nextKey}"]`)
+        ?.focus();
+    },
+    [action, selectAction, selectedPair]
+  );
+
   const selectPair = useCallback(
     (id: string) => {
       const pair = pairs.find((candidate) => candidate.id === id);
@@ -590,14 +626,21 @@ export function VeylbaseAppShell({
       if (intent === "decryptBalance") {
         body = { intent, pairId: selectedPair.id, account };
       } else {
-        if (selectedPair.decimals == null) {
+        // Unshield spends the confidential token, which can carry different
+        // decimals than the underlying — mirror runAction so the planned amount
+        // is scaled the same way it is executed.
+        const amountDecimals =
+          intent === "unwrap"
+            ? selectedPair.confidentialDecimals
+            : selectedPair.decimals;
+        if (amountDecimals == null) {
           throw new Error(
             "Live token decimals are unavailable. Enable the live registry to plan amounts."
           );
         }
         const amountBaseUnits = parseUnits(
           amount || "0",
-          selectedPair.decimals
+          amountDecimals
         ).toString();
         body = {
           intent,
@@ -955,17 +998,24 @@ export function VeylbaseAppShell({
 
       <div className="vb-workspace">
         <section className="vb-terminal" aria-label="Action workspace">
-          <div className="vb-modes" role="tablist" aria-label="Asset actions">
+          <div
+            className="vb-modes"
+            role="tablist"
+            aria-label="Asset actions"
+            onKeyDown={onModesKeyDown}
+          >
             {modeTabs.map(({ idx, key, label }) => {
               const disabled = key === "claimFaucet" && !selectedPair.faucet;
               return (
                 <button
                   aria-selected={action === key}
                   className={cx("vb-mode", action === key && "is-active")}
+                  data-mode-key={key}
                   disabled={disabled}
                   key={key}
                   onClick={() => selectAction(key)}
                   role="tab"
+                  tabIndex={action === key ? 0 : -1}
                   title={
                     disabled ? "This asset does not expose the public faucet" : label
                   }
