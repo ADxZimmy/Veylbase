@@ -1,6 +1,20 @@
 import Link from "next/link";
-import { ArrowRight, Lock, Shield } from "lucide-react";
+import { ArrowRight, ExternalLink, Lock, Shield } from "lucide-react";
 import { BrandMark } from "./brand-mark";
+import {
+  etherscanAddressUrl,
+  SEPOLIA_CHAIN,
+  ZAMA_WRAPPER_REGISTRY_DOC_URL
+} from "@/lib/chains";
+
+const footerLinks = [
+  { label: "GitHub", href: "https://github.com/ADxZimmy/Veylbase" },
+  {
+    label: "Registry contract",
+    href: etherscanAddressUrl(SEPOLIA_CHAIN.registryAddress)
+  },
+  { label: "Zama docs", href: ZAMA_WRAPPER_REGISTRY_DOC_URL }
+];
 
 const flowSteps = [
   {
@@ -184,10 +198,24 @@ export default function Home() {
             VEYLBASE · BUILT FOR THE ZAMA DEVELOPER PROGRAM · RUNS ON SEPOLIA
           </span>
         </span>
-        <Link className="vb-footer-link" href="/app">
-          Enter dApp
-          <ArrowRight size={15} aria-hidden="true" />
-        </Link>
+        <nav className="vb-footer-links" aria-label="Resources">
+          {footerLinks.map((link) => (
+            <a
+              className="vb-footer-reslink"
+              href={link.href}
+              key={link.label}
+              rel="noreferrer noopener"
+              target="_blank"
+            >
+              {link.label}
+              <ExternalLink size={13} aria-hidden="true" />
+            </a>
+          ))}
+          <Link className="vb-footer-link" href="/app">
+            Enter dApp
+            <ArrowRight size={15} aria-hidden="true" />
+          </Link>
+        </nav>
       </footer>
     </main>
   );

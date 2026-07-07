@@ -19,6 +19,22 @@ Built for the Zama Developer Program, the app is intentionally UX-first: the pub
 - Unshield confidential balances through the SDK's two-step unwrap and finalize flow.
 - Open the developer plan drawer when you want the exact contract calls and SDK methods.
 
+## Network Scope
+
+Veylbase targets **Sepolia**, where Zama's confidential wrapper registry and the
+FHE relayer/gateway used by `@zama-fhe/sdk` operate for the Developer Program.
+Confidential execution (shield, reveal, unshield) requires that Zama FHE runtime
+on the target chain, so Sepolia is where the full flow is real today.
+
+The app is **registry-driven, not chain-hardcoded**: `src/server/registry/service.ts`
+reads the confidential-wrapper registry for its configured chain and surfaces
+every pair it returns, and the UI renders whatever the registry provides with
+live token metadata. Extending to another network is a configuration change —
+chain constants and a registry address in `src/lib/chains.ts` — rather than a
+per-pair UI rewrite. Where the confidential runtime is not yet available on a
+chain, pairs can only be surfaced read-only; consult the Zama protocol docs for
+current per-network availability before enabling actions there.
+
 ## Local Setup
 
 ```bash

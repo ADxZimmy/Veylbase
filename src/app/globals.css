@@ -1,5 +1,6 @@
-@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap");
 @import "tailwindcss";
+/* Fonts are self-hosted via next/font (see layout.tsx); the --font-* tokens
+   below point at the CSS variables it injects. No Google @import at runtime. */
 
 /*
  * Veylbase — Veiled Ledger Interface
@@ -47,9 +48,9 @@
   --danger: #e58b7b;
   --danger-text: #eca898;
 
-  --font-display: "IBM Plex Sans Condensed", "IBM Plex Sans", Arial, sans-serif;
-  --font-body: "IBM Plex Sans", Helvetica, Arial, sans-serif;
-  --font-mono: "JetBrains Mono", Consolas, monospace;
+  --font-display: var(--font-plex-condensed), "IBM Plex Sans", Arial, sans-serif;
+  --font-body: var(--font-plex-sans), Helvetica, Arial, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), Consolas, monospace;
 }
 
 * {
@@ -344,6 +345,7 @@ button:disabled {
 
 .vb-alert {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
   margin: 14px clamp(16px, 3vw, 32px) 0;
@@ -372,6 +374,53 @@ button:disabled {
   transition: background 150ms ease;
 }
 .vb-alert-switch:hover { background: rgba(229, 139, 123, 0.12); }
+.vb-alert-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  font: 600 12.5px var(--font-body);
+  color: var(--danger-text);
+  white-space: nowrap;
+}
+.vb-alert-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* app footer — resource links */
+.vb-appfooter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 20px;
+  width: min(100%, 1280px);
+  margin: 0 auto;
+  padding: 18px clamp(16px, 3vw, 32px) 44px;
+  border-top: 1px solid var(--border-soft);
+}
+.vb-appfooter-brand {
+  font: 500 10.5px var(--font-mono);
+  color: var(--muted-3);
+}
+.vb-appfooter-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 18px;
+}
+.vb-appfooter-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: 600 12px var(--font-body);
+  color: var(--muted);
+  transition: color 150ms ease;
+}
+.vb-appfooter-link:hover {
+  color: var(--accent);
+}
 
 /* ---------- workspace ---------- */
 
@@ -1357,6 +1406,27 @@ button:disabled {
   line-height: 1.5;
   color: var(--muted-3);
 }
+.vb-sample-tag {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 6px;
+  border: 1px solid var(--accent-line);
+  border-radius: 2px;
+  background: var(--accent-soft);
+  font: 600 9.5px var(--font-mono);
+  color: var(--accent);
+  vertical-align: middle;
+}
+.vb-drawer-sample-note {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px dashed var(--accent-line);
+  border-radius: 3px;
+  background: var(--accent-soft);
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--muted);
+}
 
 /* ============================================================
  * LANDING
@@ -1820,4 +1890,76 @@ button:disabled {
 }
 .vb-footer-link:hover {
   color: var(--accent-hover);
+}
+.vb-footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 20px;
+}
+.vb-footer-reslink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: 600 13px var(--font-body);
+  color: var(--muted);
+  transition: color 150ms ease;
+}
+.vb-footer-reslink:hover {
+  color: var(--accent);
+}
+
+/* 404 — not found */
+.vb-notfound {
+  display: flex;
+  min-height: 100vh;
+  flex-direction: column;
+  justify-content: center;
+  gap: 40px;
+  width: min(100%, 640px);
+  margin: 0 auto;
+  padding: 48px clamp(20px, 5vw, 40px) 88px;
+  background:
+    radial-gradient(560px 320px at 28% 32%, var(--accent-soft), transparent 70%),
+    var(--background);
+}
+.vb-notfound .vb-brand--lg {
+  align-self: flex-start;
+}
+.vb-notfound-body {
+  display: flex;
+  flex-direction: column;
+}
+.vb-notfound-code {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 22px 0 0;
+  font: 700 clamp(3.4rem, 12vw, 6rem) var(--font-display);
+  line-height: 1;
+  color: var(--foreground);
+}
+.vb-notfound-blocks {
+  display: inline-flex;
+  gap: 6px;
+}
+.vb-notfound-blocks i {
+  height: clamp(38px, 9vw, 62px);
+  background: var(--redact);
+}
+.vb-notfound-blocks i:nth-child(2) {
+  background: var(--redact-2);
+}
+.vb-notfound-title {
+  margin: 22px 0 0;
+  font: 700 clamp(1.6rem, 4vw, 2.2rem) var(--font-display);
+  line-height: 1.05;
+  color: var(--foreground);
+}
+.vb-notfound-lede {
+  margin: 14px 0 0;
+  max-width: 480px;
+  font-size: clamp(1rem, 1.5vw, 1.08rem);
+  line-height: 1.6;
+  color: var(--muted);
 }

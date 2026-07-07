@@ -8,9 +8,19 @@ import {
   useMemo,
   useState
 } from "react";
-import { ChevronDown, Code2, Eye, Lock, Search, Wallet, X } from "lucide-react";
+import {
+  ChevronDown,
+  Code2,
+  ExternalLink,
+  Eye,
+  Lock,
+  Search,
+  Wallet,
+  X
+} from "lucide-react";
 import { formatUnits, getAddress, parseUnits, type Hex } from "viem";
 import { BrandMark } from "./brand-mark";
+import { ZAMA_WRAPPER_REGISTRY_DOC_URL } from "@/lib/chains";
 import type {
   ActionPlanKey,
   UiRegistryChain,
@@ -72,6 +82,14 @@ interface PrivateBalance {
 interface ExecutionState extends ExecutionProgress {
   status: "running" | "success" | "error";
 }
+
+const REPO_URL = "https://github.com/ADxZimmy/Veylbase";
+const METAMASK_URL = "https://metamask.io/download/";
+// A placeholder wallet + amount used to render an illustrative plan in the dev
+// drawer before the user connects — so judges can inspect the planner without a
+// wallet. Clearly labelled "SAMPLE" in the UI.
+const SAMPLE_ACCOUNT = "0x7A3fD2bE514f21bA8C6E1cD90dF06E5AcCa1C921";
+const SAMPLE_AMOUNT = "100";
 
 const modeTabs: Array<{ key: ActionPlanKey; idx: string; label: string }> = [
   { key: "wrap", idx: "01", label: "Shield" },
@@ -207,6 +225,7 @@ export function VeylbaseAppShell({
   const [planLoading, setPlanLoading] = useState(false);
   const [planError, setPlanError] = useState<string | null>(null);
   const [plan, setPlan] = useState<PlanData | null>(null);
+  const [planIsSample, setPlanIsSample] = useState(false);
   const [account, setAccount] = useState<string | null>(null);
   const [chainId, setChainId] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
@@ -617,14 +636,19 @@ export function VeylbaseAppShell({
   }, [action, publicBalance]);
 
   const buildPlan = useCallback(
-    async (intent: ActionPlanKey) => {
-      if (!selectedPair || !account) {
+    async (
+      intent: ActionPlanKey,
+      override?: { account?: string; amount?: string }
+    ) => {
+      const planAccount = override?.account ?? account;
+      const planAmount = override?.amount ?? amount;
+      if (!selectedPair || !planAccount) {
         throw new Error("Connect your wallet before building a transaction plan.");
       }
 
       let body: Record<string, unknown>;
       if (intent === "decryptBalance") {
-        body = { intent, pairId: selectedPair.id, account };
+        body = { intent, pairId: selectedPair.id, account: planAccount };
       } else {
         // Unshield spends the confidential token, which can carry different
         // decimals than the underlying — mirror runAction so the planned amount
@@ -639,13 +663,13 @@ export function VeylbaseAppShell({
           );
         }
         const amountBaseUnits = parseUnits(
-          amount || "0",
+          planAmount || "0",
           amountDecimals
         ).toString();
         body = {
           intent,
           pairId: selectedPair.id,
-          account,
+          account: planAccount,
           amountBaseUnits
         };
       }
@@ -674,6 +698,7 @@ export function VeylbaseAppShell({
       if (!selectedPair || !account) return;
       setPlanLoading(true);
       setPlanError(null);
+      setPlanIsSample(false);
       setPlanOpen(true);
       try {
         setPlan(await buildPlan(intent));
@@ -688,6 +713,34 @@ export function VeylbaseAppShell({
       }
     },
     [account, buildPlan, pushActivity, selectedPair]
+  );
+
+  // Before connect (or with no amount entered), show an illustrative plan for a
+  // placeholder wallet so the planner is inspectable without a wallet.
+  const generateSamplePlan = useCallback(
+    async (intent: ActionPlanKey) => {
+      if (!selectedPair) return;
+      setPlanLoading(true);
+      setPlanError(null);
+      setPlanIsSample(true);
+      setPlanOpen(true);
+      try {
+        setPlan(
+          await buildPlan(intent, {
+            account: SAMPLE_ACCOUNT,
+            amount: SAMPLE_AMOUNT
+          })
+        );
+      } catch (error) {
+        setPlan(null);
+        setPlanError(
+          error instanceof Error ? error.message : "Unable to build a sample plan."
+        );
+      } finally {
+        setPlanLoading(false);
+      }
+    },
+    [buildPlan, selectedPair]
   );
 
   const failAction = useCallback(
@@ -931,7 +984,15 @@ export function VeylbaseAppShell({
   const openPlanDrawer = useCallback(() => {
     setPlanOpen(true);
     if (account && (isReveal || amountIsPositive)) void generatePlan(action);
-  }, [account, action, amountIsPositive, generatePlan, isReveal]);
+    else void generateSamplePlan(action);
+  }, [
+    account,
+    action,
+    amountIsPositive,
+    generatePlan,
+    generateSamplePlan,
+    isReveal
+  ]);
 
   if (!selectedPair) return null;
 
@@ -983,7 +1044,18 @@ export function VeylbaseAppShell({
 
       {walletError ? (
         <div className="vb-alert" role="alert">
-          {walletError}
+          <span>{walletError}</span>
+          {walletError.startsWith("No EVM wallet") ? (
+            <a
+              className="vb-alert-link"
+              href={METAMASK_URL}
+              rel="noreferrer noopener"
+              target="_blank"
+            >
+              Install MetaMask
+              <ExternalLink size={13} aria-hidden="true" />
+            </a>
+          ) : null}
         </div>
       ) : null}
 
@@ -1190,6 +1262,8 @@ export function VeylbaseAppShell({
         <ActivityPanel activity={activity} chain={snapshot.chain} />
       </div>
 
+      <AppFooter chain={snapshot.chain} />
+
       {assetSheetOpen ? (
         <AssetSheet
           filter={filter}
@@ -1211,6 +1285,7 @@ export function VeylbaseAppShell({
           loading={planLoading}
           onClose={() => setPlanOpen(false)}
           plan={plan}
+          sample={planIsSample}
           title={planTitleByAction[action]}
         />
       ) : null}
@@ -1320,6 +1395,35 @@ function Topbar({
 
 function explorerTxUrl(chain: UiRegistryChain, txHash: Hex) {
   return `${chain.explorerUrl}/tx/${txHash}`;
+}
+
+function AppFooter({ chain }: { chain: UiRegistryChain }) {
+  const links = [
+    { label: "GitHub", href: REPO_URL },
+    { label: "Registry contract", href: `${chain.explorerUrl}/address/${chain.registryAddress}` },
+    { label: "Zama docs", href: ZAMA_WRAPPER_REGISTRY_DOC_URL }
+  ];
+  return (
+    <footer className="vb-appfooter">
+      <span className="vb-appfooter-brand">
+        VEYLBASE · BUILT FOR THE ZAMA DEVELOPER PROGRAM · SEPOLIA
+      </span>
+      <nav className="vb-appfooter-links" aria-label="Resources">
+        {links.map((link) => (
+          <a
+            className="vb-appfooter-link"
+            href={link.href}
+            key={link.label}
+            rel="noreferrer noopener"
+            target="_blank"
+          >
+            {link.label}
+            <ExternalLink size={13} aria-hidden="true" />
+          </a>
+        ))}
+      </nav>
+    </footer>
+  );
 }
 
 function ExecutionStatus({
@@ -1467,7 +1571,9 @@ function ActivityPanel({
     <aside className="vb-tape" aria-label="Activity">
       <div className="vb-tape-head">
         <span>EVENT TAPE</span>
-        <span className="vb-tape-count">{activity.length} / 6</span>
+        {activity.length > 0 ? (
+          <span className="vb-tape-count">{activity.length} / 6</span>
+        ) : null}
       </div>
       {activity.length === 0 ? (
         <p className="vb-tape-empty">Connect your wallet to begin.</p>
@@ -1623,6 +1729,7 @@ function PlanDrawer({
   loading,
   onClose,
   plan,
+  sample,
   title
 }: {
   chain: UiRegistryChain;
@@ -1631,6 +1738,7 @@ function PlanDrawer({
   loading: boolean;
   onClose: () => void;
   plan: PlanData | null;
+  sample: boolean;
   title: string;
 }) {
   return (
@@ -1647,7 +1755,10 @@ function PlanDrawer({
       >
         <div className="vb-drawer-head">
           <span className="vb-drawer-title">
-            <strong>Transaction plan</strong>
+            <strong>
+              Transaction plan
+              {sample && plan ? <span className="vb-sample-tag">SAMPLE</span> : null}
+            </strong>
             <small>{title}</small>
           </span>
           <button aria-label="Close" className="vb-icon-btn" onClick={onClose} type="button">
@@ -1669,12 +1780,7 @@ function PlanDrawer({
         </div>
 
         <div className="vb-drawer-body">
-          {!connected ? (
-            <p className="vb-drawer-hint">
-              Connect your wallet, then run an action to generate the live transaction
-              plan from the Veylbase planner.
-            </p>
-          ) : loading ? (
+          {loading ? (
             <p className="vb-drawer-hint vb-drawer-loading" data-anim-loop="true">
               Building plan…
             </p>
@@ -1684,6 +1790,12 @@ function PlanDrawer({
             </p>
           ) : plan ? (
             <>
+              {sample ? (
+                <p className="vb-drawer-sample-note">
+                  Illustrative plan for a placeholder wallet. Connect to generate a
+                  live plan for your own address and amount.
+                </p>
+              ) : null}
               {plan.steps.map((step, index) => (
                 <div className="vb-step" key={step.id}>
                   <div className="vb-step-head">
@@ -1714,6 +1826,11 @@ function PlanDrawer({
                 wrapper-registry &amp; confidential-wrapper docs.
               </p>
             </>
+          ) : !connected ? (
+            <p className="vb-drawer-hint">
+              Connect your wallet, then run an action to generate the live transaction
+              plan from the Veylbase planner.
+            </p>
           ) : (
             <p className="vb-drawer-hint">Run an action to generate a plan.</p>
           )}

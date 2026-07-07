@@ -1,5 +1,32 @@
 import type { Metadata } from "next";
+import {
+  IBM_Plex_Sans,
+  IBM_Plex_Sans_Condensed,
+  JetBrains_Mono
+} from "next/font/google";
 import "./globals.css";
+
+// Self-hosted at build time (no render-blocking Google @import, no font flash,
+// no third-party request on load — on-message for a privacy-first app). Exposed
+// as CSS variables the --font-* design tokens consume in globals.css.
+const plexSans = IBM_Plex_Sans({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-plex-sans",
+  display: "swap"
+});
+const plexCondensed = IBM_Plex_Sans_Condensed({
+  subsets: ["latin"],
+  weight: ["500", "600", "700"],
+  variable: "--font-plex-condensed",
+  display: "swap"
+});
+const jetBrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-jetbrains-mono",
+  display: "swap"
+});
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://veylbase.vercel.app";
 const description =
@@ -60,7 +87,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html
+      lang="en"
+      className={`${plexSans.variable} ${plexCondensed.variable} ${jetBrainsMono.variable}`}
+    >
       <body>{children}</body>
     </html>
   );
