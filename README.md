@@ -82,6 +82,20 @@ npm run start
 
 Node is pinned to `24.x` through `package.json` engines for Vercel and local parity.
 
+## Deployment
+
+Production runs on Vercel at https://veylbase.vercel.app. There are no custom
+deploy scripts and no `vercel.json` — the Vercel GitHub integration builds
+`main` with the framework defaults (`npm run build`), so pushing to `main` is
+the deploy.
+
+- Set `NEXT_PUBLIC_SEPOLIA_RPC_URL` in the Vercel project environment. The
+  value ships to the browser, so use a domain/referrer-restricted key.
+- Security headers (`Referrer-Policy`, `X-Content-Type-Options`,
+  `X-Frame-Options: DENY`, and a `frame-ancestors 'none'` CSP) ship from
+  `next.config.ts`; no platform-level header configuration is needed.
+- Rehearse the production build locally with `npm run build && npm run start`.
+
 ## Architecture
 
 - `src/app/page.tsx` is the public landing page.
@@ -109,7 +123,9 @@ The confidential execution path uses `@zama-fhe/sdk` `^3.2.0` and the SDK's Sepo
 - Relayer: `https://relayer.testnet.zama.org/v2`
 - Registry: `0x2f0750Bbb0A246059d80e94c454586a7F27a128e`
 
-The browser SDK loads its runtime from `cdn.zama.org`, uses a blob worker, and runs through `web()` without threaded mode. Do not add COOP/COEP headers for this submission path; they can block runtime fetches or wallet popups. The app currently ships only `Referrer-Policy` and `X-Content-Type-Options`.
+The browser SDK loads its runtime from `cdn.zama.org`, uses a blob worker, and runs through `web()` without threaded mode. Do not add COOP/COEP headers for this submission path; they can block runtime fetches or wallet popups. The app ships `Referrer-Policy`, `X-Content-Type-Options`, `X-Frame-Options`, and a `frame-ancestors 'none'` CSP — framing protection only, nothing cross-origin-isolating.
+
+Faucet, shield, reveal, and unshield have all been exercised end to end against this runtime on Sepolia with a funded wallet.
 
 `src/lib/chains.ts` still contains display-only registry metadata inherited from earlier planning (`gatewayChainId: 55815`, `relayer.testnet.zama.cloud`). Confidential execution does not use those values; Phase 006 UAT should confirm live Network-tab traffic before changing the displayed constants.
 
@@ -128,10 +144,9 @@ Use [docs/DEMO.md](docs/DEMO.md) for the 3-minute recording plan. The program re
 
 ## Known Limitations
 
-- Funded-wallet UAT and final connected-state screenshots are Phase 006 tasks. The app must still be proven against a live relayer with faucet, shield, reveal, and unshield transactions before submission.
 - If a user switches networks while a wallet transaction is mid-flow, the wallet/RPC may orphan that interaction. Veylbase clears local balances and plans on chain changes; pending unshield recovery covers the specific unwrap-submitted case once the hash is stored.
 - Revealed confidential balances are session-only and auto-hide after a short window. The user can reveal again with another signature.
-- If live confidential token decimals are unavailable, the reveal display falls back to 6 decimals. The registry tests cover populated metadata, but Phase 006 UAT should verify WETH-style 18 public / 6 confidential pairs end to end.
+- If live confidential token decimals are unavailable, the reveal display falls back to 6 decimals; amount entry requires live decimals and says so rather than guessing.
 - The default public Sepolia RPC can be rate-limited. Use a dedicated, referrer-restricted `NEXT_PUBLIC_SEPOLIA_RPC_URL` for demo and deployment.
 
 ## License
