@@ -35,6 +35,29 @@ live token metadata. Pointing it at another network is a configuration change �
 chain constants and a registry address in `src/lib/chains.ts` — not a per-pair
 UI rewrite, so the app follows the registry wherever Zama deploys it.
 
+## Challenge Criteria Map
+
+- **Coverage** — all 8 official Sepolia pairs (7 public-mint cTokenMocks plus
+  the restricted tGBP) ship in the typed snapshot
+  (`src/lib/registry/official-sepolia.ts`, counts pinned by tests) and are
+  reconciled against the on-chain registry on live loads; pairs unknown to the
+  snapshot are surfaced automatically. `GET /api/registry/validate?live=true`
+  returns machine-checkable coverage checks (official pairs present, faucet
+  coverage, wrap/unwrap/decrypt capability on every pair, no duplicates).
+- **Correctness** — wrap, unwrap, and balance decryption run through
+  `@zama-fhe/sdk` helpers: user decryption uses the SDK's canonical EIP-712
+  permit flow (a wallet signature; nothing is broadcast), and unwrap is the
+  two-step encrypted request → finalize flow with the request hash persisted
+  for resume. Amounts are base-unit bigints end to end, so the preview,
+  balance checks, and execution can never disagree — including pairs whose
+  public and confidential decimals differ (WETH 18 → 6, with the flooring
+  refund shown exactly). The Dev Plan drawer shows the ordered contract calls
+  and SDK steps behind every action.
+- **Extensibility** — three documented tiers for adding a pair: automatic
+  surfacing for anything registered in the on-chain wrapper registry, a typed
+  curated snapshot guarded by tests, and a config-only local tier. See
+  [docs/ADD_PAIR.md](docs/ADD_PAIR.md).
+
 ## Local Setup
 
 ```bash
@@ -90,9 +113,14 @@ The browser SDK loads its runtime from `cdn.zama.org`, uses a blob worker, and r
 
 `src/lib/chains.ts` still contains display-only registry metadata inherited from earlier planning (`gatewayChainId: 55815`, `relayer.testnet.zama.cloud`). Confidential execution does not use those values; Phase 006 UAT should confirm live Network-tab traffic before changing the displayed constants.
 
-## Add A Local Pair
+## Add a Pair
 
-Use [docs/ADD_PAIR.md](docs/ADD_PAIR.md) to add dev-only pairs through `config/registry.local.json`. Local pairs merge after the official Sepolia snapshot and are ignored when they duplicate an official underlying token.
+[docs/ADD_PAIR.md](docs/ADD_PAIR.md) documents all three tiers: pairs
+registered in the on-chain wrapper registry appear automatically; curated
+pairs are added to the typed snapshot (test-guarded); dev-only pairs go
+through `config/registry.local.json` with no code change. Local pairs merge
+after the official snapshot and are ignored when they duplicate an official
+underlying token.
 
 ## Demo
 
