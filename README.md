@@ -21,19 +21,19 @@ Built for the Zama Developer Program, the app is intentionally UX-first: the pub
 
 ## Network Scope
 
-Veylbase targets **Sepolia**, where Zama's confidential wrapper registry and the
-FHE relayer/gateway used by `@zama-fhe/sdk` operate for the Developer Program.
-Confidential execution (shield, reveal, unshield) requires that Zama FHE runtime
-on the target chain, so Sepolia is where the full flow is real today.
+This is the challenge scope in full: surface **every** ERC-20 ↔ ERC-7984 wrapper
+pair on **testnet (Sepolia)**, wrap and unwrap any pair, decrypt any ERC-7984
+balance, and mint from the **Sepolia faucet** for the official cTokenMocks. The
+confidential wrapper registry and the FHE relayer/gateway used by `@zama-fhe/sdk`
+run on Sepolia for the Developer Program, so Sepolia is where the confidential
+flow is real — testnet is the intended target, not a limitation.
 
 The app is **registry-driven, not chain-hardcoded**: `src/server/registry/service.ts`
-reads the confidential-wrapper registry for its configured chain and surfaces
-every pair it returns, and the UI renders whatever the registry provides with
-live token metadata. Extending to another network is a configuration change —
-chain constants and a registry address in `src/lib/chains.ts` — rather than a
-per-pair UI rewrite. Where the confidential runtime is not yet available on a
-chain, pairs can only be surfaced read-only; consult the Zama protocol docs for
-current per-network availability before enabling actions there.
+reconciles the official snapshot with live on-chain registry reads and surfaces
+every pair the registry returns, and the UI renders whatever it provides with
+live token metadata. Pointing it at another network is a configuration change —
+chain constants and a registry address in `src/lib/chains.ts` — not a per-pair
+UI rewrite, so the app follows the registry wherever Zama deploys it.
 
 ## Local Setup
 
