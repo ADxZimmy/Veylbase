@@ -2,20 +2,9 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  ChevronDown,
-  Code2,
-  Droplet,
-  Eye,
-  Lock,
-  RotateCw,
-  Search,
-  Shield,
-  Wallet,
-  X
-} from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import { ChevronDown, Code2, Eye, Lock, Search, Wallet, X } from "lucide-react";
 import { formatUnits, getAddress, parseUnits, type Hex } from "viem";
+import { BrandMark } from "./brand-mark";
 import type {
   ActionPlanKey,
   UiRegistryChain,
@@ -45,6 +34,7 @@ interface VeylbaseAppShellProps {
 
 interface ActivityEvent {
   id: string;
+  time: string;
   title: string;
   tone: "neutral" | "accent" | "success";
   detail?: string;
@@ -77,11 +67,11 @@ interface ExecutionState extends ExecutionProgress {
   status: "running" | "success" | "error";
 }
 
-const actionTabs: Array<{ key: ActionPlanKey; label: string; Icon: LucideIcon }> = [
-  { key: "wrap", label: "Shield", Icon: Shield },
-  { key: "unwrap", label: "Unshield", Icon: RotateCw },
-  { key: "decryptBalance", label: "Reveal", Icon: Eye },
-  { key: "claimFaucet", label: "Test tokens", Icon: Droplet }
+const modeTabs: Array<{ key: ActionPlanKey; idx: string; label: string }> = [
+  { key: "wrap", idx: "01", label: "Shield" },
+  { key: "unwrap", idx: "02", label: "Unshield" },
+  { key: "decryptBalance", idx: "03", label: "Reveal" },
+  { key: "claimFaucet", idx: "04", label: "Test tokens" }
 ];
 
 const filterTabs: Array<{ key: FilterKey; label: string }> = [
@@ -104,6 +94,12 @@ const eyebrowByAction: Record<ActionPlanKey, string> = {
   claimFaucet: "Test tokens"
 };
 
+const toneClassByTone: Record<ActivityEvent["tone"], string> = {
+  neutral: "vb-tape-row--neutral",
+  accent: "vb-tape-row--accent",
+  success: "vb-tape-row--success"
+};
+
 const FAUCET_PER_CALL_LIMIT = 1_000_000;
 const REVEALED_BALANCE_TTL_MS = 8_000;
 const ACTION_SOFT_TIMEOUT_MS = 90_000;
@@ -118,6 +114,10 @@ function monoBadge(symbol: string) {
 
 function shortAddress(address: string) {
   return `${address.slice(0, 6)}…${address.slice(-4)}`;
+}
+
+function timeStamp() {
+  return new Date().toTimeString().slice(0, 8);
 }
 
 function floorTo(value: number, decimals: number) {
@@ -167,6 +167,7 @@ export function VeylbaseAppShell({
   const [activity, setActivity] = useState<ActivityEvent[]>([]);
   const [balances, setBalances] = useState<Record<string, TokenBalance>>({});
   const [privateBalances, setPrivateBalances] = useState<Record<string, PrivateBalance>>({});
+  const [revealNonce, setRevealNonce] = useState(0);
   const [balanceRefreshKey, setBalanceRefreshKey] = useState(0);
   const [execution, setExecution] = useState<ExecutionState | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -194,6 +195,7 @@ export function VeylbaseAppShell({
       [
         {
           id: `${Date.now()}-${current.length}`,
+          time: timeStamp(),
           title,
           tone,
           detail,
@@ -355,6 +357,19 @@ export function VeylbaseAppShell({
     return () => window.clearTimeout(timer);
   }, [account, chainId, privateBalance, selectedPair]);
 
+  // Esc closes either open overlay (accessibility requirement).
+  useEffect(() => {
+    if (!assetSheetOpen && !planOpen) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setAssetSheetOpen(false);
+        setPlanOpen(false);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [assetSheetOpen, planOpen]);
+
   useEffect(() => {
     if (!executing) return;
     const timer = window.setTimeout(() => {
@@ -425,7 +440,6 @@ export function VeylbaseAppShell({
       return {
         sendLabel: "You shield",
         send: `${formatPlain(amountNumber)} ${selectedPair.symbol}`,
-        receiveLabel: "You receive",
         receive: `${formatAmount(capped, confDecimals)} ${selectedPair.confidentialSymbol}`,
         refund: refund > 0 ? `${trimZeros(refund.toFixed(12))} ${selectedPair.symbol}` : null,
         note: losesPrecision
@@ -437,7 +451,6 @@ export function VeylbaseAppShell({
       return {
         sendLabel: "You unshield",
         send: `${formatPlain(amountNumber)} ${selectedPair.confidentialSymbol}`,
-        receiveLabel: "You receive",
         receive: `${formatPlain(amountNumber)} ${selectedPair.symbol}`,
         refund: null,
         note: "Two-step: request then finalize. Funds arrive after confirmation."
@@ -446,7 +459,6 @@ export function VeylbaseAppShell({
     return {
       sendLabel: "You mint",
       send: `${formatPlain(amountNumber)} ${selectedPair.symbol}`,
-      receiveLabel: "You receive",
       receive: `${formatPlain(amountNumber)} ${selectedPair.symbol}`,
       refund: null,
       note: "Public mock faucet · up to 1,000,000 per call. Sepolia testing only."
@@ -629,6 +641,7 @@ export function VeylbaseAppShell({
           ...current,
           [selectedPair.id]: { raw: revealed.value, formatted }
         }));
+        setRevealNonce((current) => current + 1);
         setExecution({
           status: "success",
           phase: "complete",
@@ -809,10 +822,19 @@ export function VeylbaseAppShell({
   const primaryLabel = executing
     ? "Working..."
     : primaryLabelFor(action, Boolean(account));
-  const revealCta = account ? "Sign & reveal" : "Connect & reveal";
+  const revealCta = executing
+    ? "Revealing..."
+    : account
+      ? "Sign & reveal"
+      : "Connect & reveal";
   const amountLabel =
-    action === "unwrap" ? "Amount to unshield" : action === "claimFaucet" ? "Amount to mint" : "Amount to shield";
-  const fromSymbol = action === "unwrap" ? selectedPair.confidentialSymbol : selectedPair.symbol;
+    action === "unwrap"
+      ? "Amount to unshield"
+      : action === "claimFaucet"
+        ? "Amount to mint"
+        : "Amount to shield";
+  const fromSymbol =
+    action === "unwrap" ? selectedPair.confidentialSymbol : selectedPair.symbol;
   const publicBalanceDisplay = !account
     ? "Connect"
     : wrongNetwork
@@ -820,70 +842,82 @@ export function VeylbaseAppShell({
       : publicBalance
         ? formatAmount(Number(publicBalance.formatted), selectedPair.decimals)
         : "...";
-
-  const privateBalanceDisplay = privateBalance
-    ? privateBalance.formatted
-    : "******";
+  const privateValueDisplay = privateBalance
+    ? `${privateBalance.formatted} ${selectedPair.confidentialSymbol}`
+    : null;
+  const chainDotClass = !account
+    ? "vb-dot--grey"
+    : onSepolia
+      ? "vb-dot--success"
+      : "vb-dot--danger";
 
   return (
     <main className="vb-app">
       <Topbar
         account={account}
-        chain={snapshot.chain}
+        chainDotClass={chainDotClass}
         connecting={connecting}
         onConnect={connect}
         onDisconnect={disconnect}
         onOpenPlan={openPlanDrawer}
       />
 
-      {walletError ? <div className="vb-wallet-error" role="alert">{walletError}</div> : null}
+      {walletError ? (
+        <div className="vb-alert" role="alert">
+          {walletError}
+        </div>
+      ) : null}
 
       {wrongNetwork ? (
-        <div className="vb-wallet-error vb-network-warn" role="alert">
+        <div className="vb-alert vb-alert--network" role="alert">
           <span>Your wallet is on the wrong network. Veylbase runs on Sepolia.</span>
-          <button className="vb-ghost" onClick={switchToSepolia} type="button">
+          <button className="vb-alert-switch" onClick={switchToSepolia} type="button">
             Switch to Sepolia
           </button>
         </div>
       ) : null}
 
-      <div className="vb-column">
-        <header className="vb-heading">
-          <span className="vb-eyebrow">{eyebrow}</span>
-          <h1>{title}</h1>
-          <p>{subtitle}</p>
-        </header>
+      <div className="vb-workspace">
+        <section className="vb-terminal" aria-label="Action workspace">
+          <div className="vb-modes" role="tablist" aria-label="Asset actions">
+            {modeTabs.map(({ idx, key, label }) => {
+              const disabled = key === "claimFaucet" && !selectedPair.faucet;
+              return (
+                <button
+                  aria-selected={action === key}
+                  className={cx("vb-mode", action === key && "is-active")}
+                  disabled={disabled}
+                  key={key}
+                  onClick={() => selectAction(key)}
+                  role="tab"
+                  title={
+                    disabled ? "This asset does not expose the public faucet" : label
+                  }
+                  type="button"
+                >
+                  <span className="vb-mode-idx">{idx}</span>
+                  <span className="vb-mode-label">{label}</span>
+                </button>
+              );
+            })}
+          </div>
 
-        <div className="vb-tabs" role="tablist" aria-label="Asset actions">
-          {actionTabs.map(({ Icon, key, label }) => {
-            const disabled = key === "claimFaucet" && !selectedPair.faucet;
-            return (
-              <button
-                aria-selected={action === key}
-                className={cx("vb-tab", action === key && "is-active")}
-                disabled={disabled}
-                key={key}
-                onClick={() => selectAction(key)}
-                role="tab"
-                type="button"
-              >
-                <Icon size={16} aria-hidden="true" />
-                {label}
-              </button>
-            );
-          })}
-        </div>
+          <header className="vb-heading">
+            <span className="vb-eyebrow">{eyebrow}</span>
+            <h1>{title}</h1>
+            <p>{subtitle}</p>
+          </header>
 
-        <div className="vb-card">
           <button
-            className="vb-asset-select"
+            aria-label="Change asset"
+            className="vb-asset"
             onClick={() => {
               setQuery("");
               setAssetSheetOpen(true);
             }}
             type="button"
           >
-            <span className="vb-asset-mono">{monoBadge(selectedPair.symbol)}</span>
+            <span className="vb-asset-badge">{monoBadge(selectedPair.symbol)}</span>
             <span className="vb-asset-id">
               <strong>
                 {selectedPair.symbol}
@@ -892,18 +926,29 @@ export function VeylbaseAppShell({
               <small>{selectedPair.name}</small>
             </span>
             <span className="vb-asset-bal">
-              <small>Public · Private</small>
-              <span>
-                {publicBalanceDisplay} <span className="vb-accent">· {privateBalanceDisplay}</span>
+              <span className="vb-bal-col">
+                <small className="vb-bal-label">PUBLIC</small>
+                <span className="vb-bal-val">{publicBalanceDisplay}</span>
+              </span>
+              <span className="vb-bal-div" />
+              <span className="vb-bal-col">
+                <small className="vb-bal-label">PRIVATE</small>
+                {privateValueDisplay ? (
+                  <span className="vb-bal-val vb-bal-val--private">
+                    {privateValueDisplay}
+                  </span>
+                ) : (
+                  <RedactBlocks variant="strip" />
+                )}
               </span>
             </span>
             <span className="vb-change">
               Change
-              <ChevronDown size={14} aria-hidden="true" />
+              <ChevronDown size={13} aria-hidden="true" />
             </span>
           </button>
 
-          <div className="vb-card-body">
+          <div className="vb-body">
             {pendingUnshield?.pairId === selectedPair.id ? (
               <PendingUnshieldNotice
                 chain={snapshot.chain}
@@ -919,15 +964,17 @@ export function VeylbaseAppShell({
                 confidentialSymbol={selectedPair.confidentialSymbol}
                 cta={revealCta}
                 loading={executing}
-                revealedValue={privateBalanceDisplay}
-                revealed={Boolean(privateBalance)}
                 onReveal={onPrimary}
+                revealNonce={revealNonce}
+                revealedValue={privateValueDisplay}
               />
             ) : (
               <div className="vb-flow">
                 <div className="vb-field">
                   <div className="vb-field-top">
-                    <span>{amountLabel}</span>
+                    <label className="vb-field-label" htmlFor="vb-amount">
+                      {amountLabel}
+                    </label>
                     <button
                       className="vb-max"
                       disabled={maxDisabled}
@@ -942,38 +989,51 @@ export function VeylbaseAppShell({
                       MAX
                     </button>
                   </div>
-                  <div className="vb-amount">
+                  <div className="vb-well">
                     <input
+                      autoComplete="off"
+                      id="vb-amount"
                       inputMode="decimal"
                       onChange={(event) => setAmount(event.target.value)}
                       placeholder="0.00"
                       value={amount}
                     />
-                    <span className="vb-amount-sym">{fromSymbol}</span>
+                    <span className="vb-well-sym">{fromSymbol}</span>
                   </div>
                   {amountErrorText ? (
-                    <span className="vb-amount-error">{amountErrorText}</span>
+                    <span className="vb-field-error" role="alert">
+                      {amountErrorText}
+                    </span>
                   ) : null}
                 </div>
 
                 {preview ? (
-                  <div className="vb-preview">
-                    <div className="vb-preview-row">
-                      <span>{preview.sendLabel}</span>
-                      <span className="vb-mono">{preview.send}</span>
+                  <div className="vb-receipt">
+                    <div className="vb-receipt-row">
+                      <span className="vb-receipt-label">{preview.sendLabel}</span>
+                      <span className="vb-leader" aria-hidden="true" />
+                      <span className="vb-receipt-val">{preview.send}</span>
                     </div>
-                    <div className="vb-preview-row">
-                      <span>{preview.receiveLabel}</span>
-                      <span className="vb-mono vb-accent">{preview.receive}</span>
+                    <div className="vb-receipt-row vb-receipt-row--receive">
+                      <span className="vb-receipt-label">You receive</span>
+                      <span className="vb-leader" aria-hidden="true" />
+                      <span className="vb-receipt-val vb-receipt-val--accent">
+                        {preview.receive}
+                      </span>
                     </div>
                     {preview.refund ? (
-                      <div className="vb-preview-row vb-preview-refund">
-                        <span>Refunded — exceeds the wrapper&rsquo;s 6-decimal precision</span>
-                        <span className="vb-mono">{preview.refund}</span>
+                      <div className="vb-receipt-row vb-receipt-row--refund">
+                        <span className="vb-receipt-label vb-receipt-label--refund">
+                          Refunded — exceeds the wrapper&rsquo;s 6-decimal precision
+                        </span>
+                        <span className="vb-leader vb-leader--blank" aria-hidden="true" />
+                        <span className="vb-receipt-val vb-receipt-val--refund">
+                          {preview.refund}
+                        </span>
                       </div>
                     ) : null}
-                    <div className="vb-preview-note">
-                      <Lock size={13} aria-hidden="true" />
+                    <div className="vb-receipt-note">
+                      <Lock size={12} aria-hidden="true" />
                       <span>{preview.note}</span>
                     </div>
                   </div>
@@ -989,6 +1049,7 @@ export function VeylbaseAppShell({
                 </button>
               </div>
             )}
+
             {execution || actionError ? (
               <ExecutionStatus
                 chain={snapshot.chain}
@@ -998,7 +1059,7 @@ export function VeylbaseAppShell({
               />
             ) : null}
           </div>
-        </div>
+        </section>
 
         <ActivityPanel activity={activity} chain={snapshot.chain} />
       </div>
@@ -1057,16 +1118,30 @@ function primaryLabelFor(action: ActionPlanKey, connected: boolean) {
   return connected ? "Shield balance" : "Connect & shield";
 }
 
+function RedactBlocks({ variant }: { variant: "strip" | "reveal" }) {
+  const widths = variant === "strip" ? [16, 10, 20, 12] : [44, 26, 52, 20, 36];
+  return (
+    <span
+      aria-label="Hidden private balance"
+      className={cx("vb-redact", `vb-redact--${variant}`)}
+    >
+      {widths.map((width, index) => (
+        <i key={index} style={{ width: `${width}px` }} />
+      ))}
+    </span>
+  );
+}
+
 function Topbar({
   account,
-  chain,
+  chainDotClass,
   connecting,
   onConnect,
   onDisconnect,
   onOpenPlan
 }: {
   account: string | null;
-  chain: UiRegistryChain;
+  chainDotClass: string;
   connecting: boolean;
   onConnect: () => void;
   onDisconnect: () => void;
@@ -1075,25 +1150,30 @@ function Topbar({
   return (
     <header className="vb-topbar">
       <Link className="vb-brand" href="/">
-        <span className="vb-brand-mark">V</span>
+        <BrandMark size={30} className="vb-brand-mark" />
         <span className="vb-brand-name">
-          <strong>Veylbase</strong>
-          <small>The confidential wrapper registry for Zama</small>
+          <strong>VEYLBASE</strong>
+          <small>CONFIDENTIAL WRAPPER REGISTRY</small>
         </span>
       </Link>
 
       <nav className="vb-topnav" aria-label="Session">
         <span className="vb-chain">
-          <span className="vb-dot vb-dot-success" />
-          {chain.name}
+          <span className={cx("vb-dot", chainDotClass)} />
+          SEPOLIA
         </span>
         <button className="vb-ghost" onClick={onOpenPlan} type="button">
-          <Code2 size={15} aria-hidden="true" />
-          Developer plan
+          <Code2 size={14} aria-hidden="true" />
+          DEV PLAN
         </button>
         {account ? (
-          <button className="vb-ghost" onClick={onDisconnect} type="button">
-            <span className="vb-dot vb-dot-success" />
+          <button
+            className="vb-wallet"
+            onClick={onDisconnect}
+            title="Disconnect wallet"
+            type="button"
+          >
+            <span className="vb-dot vb-dot--success" />
             {shortAddress(account)}
           </button>
         ) : (
@@ -1103,7 +1183,7 @@ function Topbar({
             onClick={onConnect}
             type="button"
           >
-            <Wallet size={15} aria-hidden="true" />
+            <Wallet size={14} aria-hidden="true" />
             {connecting ? "Connecting…" : "Connect wallet"}
           </button>
         )}
@@ -1131,19 +1211,19 @@ function ExecutionStatus({
   const status = execution?.status ?? "error";
   const txHash = execution?.txHash;
   return (
-    <div className={cx("vb-execution", `is-${status}`)} role="status">
-      <span className="vb-execution-dot" />
-      <span className="vb-execution-copy">
+    <div className={cx("vb-strip", "vb-strip--exec", `is-${status}`)} role="status">
+      <span className="vb-strip-dot" data-anim-loop="true" />
+      <span className="vb-strip-copy">
         <strong>{execution?.title ?? "Action did not complete"}</strong>
         <small>{error ?? execution?.detail}</small>
       </span>
       {status === "error" ? (
-        <button className="vb-execution-link" onClick={onRetry} type="button">
+        <button className="vb-link" onClick={onRetry} type="button">
           Retry
         </button>
       ) : txHash ? (
         <a
-          className="vb-execution-link"
+          className="vb-link"
           href={explorerTxUrl(chain, txHash)}
           rel="noreferrer"
           target="_blank"
@@ -1167,27 +1247,22 @@ function PendingUnshieldNotice({
   txHash: Hex;
 }) {
   return (
-    <div className="vb-pending-unshield" role="status">
-      <span className="vb-execution-dot" />
-      <span className="vb-execution-copy">
+    <div className="vb-strip vb-strip--pending" role="status">
+      <span className="vb-strip-dot" data-anim-loop="true" />
+      <span className="vb-strip-copy">
         <strong>Pending unshield found</strong>
         <small>Finish the unwrap you already submitted before starting another one.</small>
       </span>
-      <span className="vb-pending-actions">
+      <span className="vb-strip-actions">
         <a
-          className="vb-execution-link"
+          className="vb-link"
           href={explorerTxUrl(chain, txHash)}
           rel="noreferrer"
           target="_blank"
         >
           View
         </a>
-        <button
-          className="vb-execution-link"
-          disabled={disabled}
-          onClick={onResume}
-          type="button"
-        >
+        <button className="vb-link" disabled={disabled} onClick={onResume} type="button">
           Resume
         </button>
       </span>
@@ -1200,36 +1275,55 @@ function RevealPanel({
   confidentialSymbol,
   cta,
   loading,
-  revealed,
-  revealedValue,
-  onReveal
+  onReveal,
+  revealNonce,
+  revealedValue
 }: {
   account: string | null;
   confidentialSymbol: string;
   cta: string;
   loading: boolean;
-  revealed: boolean;
-  revealedValue: string;
   onReveal: () => void;
+  revealNonce: number;
+  revealedValue: string | null;
 }) {
+  const revealed = revealedValue != null;
   return (
-    <div className="vb-flow">
-      <div className="vb-reveal-card">
-        <span className="vb-reveal-label">Private holding - {confidentialSymbol}</span>
-        <strong className={cx("vb-reveal-hidden", revealed && "is-revealed")}>
-          {revealed ? revealedValue : "******"}
-        </strong>
-        <span className="vb-reveal-hint">
-          <Lock size={13} aria-hidden="true" />
-          {revealed ? "Revealed in this session" : "Hidden by default - encrypted on-chain"}
-        </span>
+    <div className="vb-reveal">
+      <div className="vb-reveal-panel">
+        <span className="vb-reveal-label">Private holding — {confidentialSymbol}</span>
+        {revealed ? (
+          <>
+            <div className="vb-reveal-value-wrap">
+              <span className="vb-reveal-scan" aria-hidden="true" key={revealNonce} />
+              <strong className="vb-reveal-value" role="status">
+                {revealedValue}
+              </strong>
+            </div>
+            <span className="vb-reveal-hint">
+              <Lock size={13} aria-hidden="true" />
+              Revealed in this session
+            </span>
+            <div className="vb-reveal-ttl" aria-hidden="true">
+              <span className="vb-reveal-ttl-bar" key={`ttl-${revealNonce}`} />
+            </div>
+          </>
+        ) : (
+          <>
+            <RedactBlocks variant="reveal" />
+            <span className="vb-reveal-hint">
+              <Lock size={13} aria-hidden="true" />
+              Hidden by default — encrypted on-chain
+            </span>
+          </>
+        )}
       </div>
       <p className="vb-reveal-copy">
-        Revealing decrypts the balance to your wallet only. You sign a permit - no
+        Revealing decrypts the balance to your wallet only. You sign a permit — no
         transaction, no on-chain trace.
       </p>
       <button className="vb-primary" disabled={loading} onClick={onReveal} type="button">
-        <Eye size={17} aria-hidden="true" />
+        <Eye size={16} aria-hidden="true" />
         {loading ? "Revealing..." : account ? cta : "Connect & reveal"}
       </button>
     </div>
@@ -1244,34 +1338,41 @@ function ActivityPanel({
   chain: UiRegistryChain;
 }) {
   return (
-    <div className="vb-activity">
-      <span className="vb-activity-title">Activity</span>
+    <aside className="vb-tape" aria-label="Activity">
+      <div className="vb-tape-head">
+        <span>EVENT TAPE</span>
+        <span className="vb-tape-count">{activity.length} / 6</span>
+      </div>
       {activity.length === 0 ? (
-        <p className="vb-activity-empty">Connect your wallet to begin.</p>
+        <p className="vb-tape-empty">Connect your wallet to begin.</p>
       ) : (
-        <div className="vb-activity-list">
+        <div className="vb-tape-list">
           {activity.map((event) => (
-            <div className="vb-activity-row" key={event.id}>
-              <span className={cx("vb-dot", `vb-dot-${event.tone}`)} />
-              <span className="vb-activity-text">
-                <strong>{event.title}</strong>
-                {event.detail ? <small>{event.detail}</small> : null}
+            <div className={cx("vb-tape-row", toneClassByTone[event.tone])} key={event.id}>
+              <span className="vb-tape-body">
+                <span className="vb-tape-top">
+                  <strong>{event.title}</strong>
+                  <small className="vb-tape-time">{event.time}</small>
+                </span>
+                {event.detail ? (
+                  <small className="vb-tape-detail">{event.detail}</small>
+                ) : null}
+                {event.txHash ? (
+                  <a
+                    className="vb-tape-link"
+                    href={explorerTxUrl(chain, event.txHash)}
+                    rel="noreferrer"
+                    target="_blank"
+                  >
+                    View on explorer
+                  </a>
+                ) : null}
               </span>
-              {event.txHash ? (
-                <a
-                  className="vb-activity-link"
-                  href={explorerTxUrl(chain, event.txHash)}
-                  rel="noreferrer"
-                  target="_blank"
-                >
-                  View
-                </a>
-              ) : null}
             </div>
           ))}
         </div>
       )}
-    </div>
+    </aside>
   );
 }
 
@@ -1319,48 +1420,47 @@ function AssetSheet({
         <div className="vb-sheet-head">
           <strong>Choose an asset</strong>
           <button aria-label="Close" className="vb-icon-btn" onClick={onClose} type="button">
-            <X size={16} aria-hidden="true" />
+            <X size={15} aria-hidden="true" />
           </button>
         </div>
 
-        <div className="vb-sheet-controls">
-          <label className="vb-search">
-            <Search size={17} aria-hidden="true" />
-            <span className="vb-sr-only">Search assets</span>
-            <input
-              onChange={(event) => onQuery(event.target.value)}
-              placeholder="Search assets"
-              type="search"
-              value={query}
-            />
-          </label>
-          <div className="vb-sheet-filters" role="group" aria-label="Asset filters">
-            {filterTabs.map((tab) => (
-              <button
-                aria-pressed={filter === tab.key}
-                className={cx("vb-pill", filter === tab.key && "is-active")}
-                key={tab.key}
-                onClick={() => onFilter(tab.key)}
-                type="button"
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
+        <label className="vb-search">
+          <Search size={15} aria-hidden="true" />
+          <span className="vb-sr-only">Search assets</span>
+          <input
+            onChange={(event) => onQuery(event.target.value)}
+            placeholder="Search assets"
+            type="search"
+            value={query}
+          />
+        </label>
+
+        <div className="vb-filters" role="group" aria-label="Asset filters">
+          {filterTabs.map((tab) => (
+            <button
+              aria-pressed={filter === tab.key}
+              className={cx("vb-filter", filter === tab.key && "is-active")}
+              key={tab.key}
+              onClick={() => onFilter(tab.key)}
+              type="button"
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
 
         <div className="vb-sheet-list">
           {filtered.length === 0 ? (
-            <p className="vb-activity-empty">No matching asset.</p>
+            <p className="vb-sheet-empty">No matching asset.</p>
           ) : (
             filtered.map((pair) => (
               <button
-                className={cx("vb-pair-row", pair.id === selectedId && "is-selected")}
+                className={cx("vb-pair", pair.id === selectedId && "is-selected")}
                 key={pair.id}
                 onClick={() => onSelect(pair.id)}
                 type="button"
               >
-                <span className="vb-pair-mono">{monoBadge(pair.symbol)}</span>
+                <span className="vb-pair-badge">{monoBadge(pair.symbol)}</span>
                 <span className="vb-pair-id">
                   <strong>
                     {pair.symbol}
@@ -1369,10 +1469,17 @@ function AssetSheet({
                   <small>{pair.name}</small>
                 </span>
                 <span className="vb-pair-tags">
-                  <span className={cx("vb-tag", pair.faucet ? "vb-tag-accent" : "vb-tag-muted")}>
-                    {pair.faucet ? "Test" : "Restricted"}
+                  <span
+                    className={cx(
+                      "vb-tag",
+                      pair.faucet ? "vb-tag--test" : "vb-tag--restricted"
+                    )}
+                  >
+                    {pair.faucet ? "TEST" : "RESTRICTED"}
                   </span>
-                  {pair.testOnly ? <span className="vb-tag vb-tag-warn">Test only</span> : null}
+                  {pair.testOnly ? (
+                    <span className="vb-tag vb-tag--testonly">TEST ONLY</span>
+                  ) : null}
                 </span>
               </button>
             ))
@@ -1401,7 +1508,11 @@ function PlanDrawer({
   title: string;
 }) {
   return (
-    <div className="vb-overlay vb-overlay-right" onClick={onClose} role="presentation">
+    <div
+      className="vb-overlay vb-overlay--drawer"
+      onClick={onClose}
+      role="presentation"
+    >
       <aside
         aria-label="Transaction plan"
         className="vb-drawer"
@@ -1409,25 +1520,25 @@ function PlanDrawer({
         role="dialog"
       >
         <div className="vb-drawer-head">
-          <div>
+          <span className="vb-drawer-title">
             <strong>Transaction plan</strong>
             <small>{title}</small>
-          </div>
+          </span>
           <button aria-label="Close" className="vb-icon-btn" onClick={onClose} type="button">
-            <X size={16} aria-hidden="true" />
+            <X size={15} aria-hidden="true" />
           </button>
         </div>
 
         <div className="vb-drawer-meta">
-          <div>
-            <span>Network</span>
-            <span className="vb-mono">
+          <div className="vb-drawer-meta-row">
+            <span>NETWORK</span>
+            <span>
               {chain.name} · {chain.chainId}
             </span>
           </div>
-          <div>
-            <span>Registry</span>
-            <span className="vb-mono">{shortAddress(chain.registryAddress)}</span>
+          <div className="vb-drawer-meta-row">
+            <span>REGISTRY</span>
+            <span>{shortAddress(chain.registryAddress)}</span>
           </div>
         </div>
 
@@ -1438,9 +1549,13 @@ function PlanDrawer({
               plan from the Veylbase planner.
             </p>
           ) : loading ? (
-            <p className="vb-drawer-hint">Building plan…</p>
+            <p className="vb-drawer-hint vb-drawer-loading" data-anim-loop="true">
+              Building plan…
+            </p>
           ) : error ? (
-            <p className="vb-drawer-hint vb-drawer-error">{error}</p>
+            <p className="vb-drawer-hint vb-drawer-error" role="alert">
+              {error}
+            </p>
           ) : plan ? (
             <>
               {plan.steps.map((step, index) => (
@@ -1448,15 +1563,17 @@ function PlanDrawer({
                   <div className="vb-step-head">
                     <span className="vb-step-n">{index + 1}</span>
                     <strong>{step.title}</strong>
-                    <span className={cx("vb-kind", kindIsWrite(step.kind) && "vb-kind-write")}>
+                    <span className={cx("vb-kind", kindIsWrite(step.kind) && "vb-kind--write")}>
                       {step.kind}
                     </span>
                   </div>
                   <p>{step.description}</p>
                   {step.contractCall ? (
                     <div className="vb-step-call">
-                      <span className="vb-accent">{step.contractCall.signature}</span>
-                      <span className="vb-dim">→ {shortAddress(step.contractCall.target)}</span>
+                      <span className="vb-step-sig">{step.contractCall.signature}</span>
+                      <span className="vb-step-target">
+                        → {shortAddress(step.contractCall.target)}
+                      </span>
                     </div>
                   ) : null}
                 </div>
